@@ -13,13 +13,13 @@ This pipeline automates the process of creating a convex hull baseplate for 3D p
 ### Running the Pipeline
 ```bash
 # Navigate to project directory
-cd "C:\Users\Vitacore\Documents\Andrew_automationTesting\Windows-Automated-BambuStudio-Slicing-and-Convex-Hull-Baseplate-master"
+cd "C:\path\to\Windows-Automated-BambuStudio-Slicing-and-Convex-Hull-Baseplate-master"
 
 # Activate virtual environment
 .\venv\Scripts\Activate.ps1
 
 # Run the pipeline
-python full_pipeline.py "C:\Users\Vitacore\Documents\Andrew_automationTesting\mask_test3\ultra_simplified_m1.stl"
+python full_pipeline.py "C:\path\to\your\model.stl"
 ```
 
 ### Pipeline Steps

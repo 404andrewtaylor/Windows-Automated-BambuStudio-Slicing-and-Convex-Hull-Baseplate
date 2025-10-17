@@ -12,7 +12,7 @@ def test_bambu_shift():
     """Test SHIFT + arrow keys in Bambu Studio"""
     
     # Path to hull STL
-    hull_stl = r"C:\Users\Vitacore\Documents\Andrew_automationTesting\mask_test3\ultra_simplified_m1_pipeline\ultra_simplified_m1_hull.stl"
+    hull_stl = r"C:\path\to\your\model_pipeline\your_model_hull.stl"
     
     print("Testing SHIFT + arrow keys in Bambu Studio...")
     print("Starting test in 3 seconds...")

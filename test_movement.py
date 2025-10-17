@@ -14,7 +14,7 @@ def test_movement():
     """Test hull movement in Bambu Studio"""
     
     # Path to hull STL
-    hull_stl = r"C:\Users\Vitacore\Documents\Andrew_automationTesting\mask_test3\ultra_simplified_m1_pipeline\ultra_simplified_m1_hull.stl"
+    hull_stl = r"C:\path\to\your\model_pipeline\your_model_hull.stl"
     
     if not os.path.exists(hull_stl):
         print(f"ERROR: Hull STL not found: {hull_stl}")

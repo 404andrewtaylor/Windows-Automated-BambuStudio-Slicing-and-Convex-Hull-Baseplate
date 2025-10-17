@@ -59,7 +59,7 @@ def send_key_combo(vk_arrow):
 def test_bambu_sendinput():
     """Test SendInput approach in Bambu Studio"""
     
-    hull_stl = r"C:\Users\Vitacore\Documents\Andrew_automationTesting\mask_test3\ultra_simplified_m1_pipeline\ultra_simplified_m1_hull.stl"
+    hull_stl = r"C:\path\to\your\model_pipeline\your_model_hull.stl"
     bambu_path = r"C:\Program Files\Bambu Studio\bambu-studio.exe"
 
     print("Testing hardware-level SendInput for SHIFT + arrow keys...")

@@ -1,5 +1,5 @@
 # Convex hull points (x,y format)
-# Generated from: C:\Users\Vitacore\Documents\Andrew_automationTesting\mask_test3\ultra_simplified_m1.gcode.3mf
+# Generated from: example_model.gcode.3mf
 # Total points: 17
 54.259,36.665
 89.008,24.082
