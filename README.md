@@ -36,7 +36,7 @@
 ## 📥 Installation & Setup
 
 ### Step 1: Download and Extract
-1. **Download the ZIP file** from GitHub: https://github.com/username/Windows-Automated-BambuStudio-Slicing-and-Convex-Hull-Baseplate
+1. **Download the ZIP file** from GitHub: https://github.com/404andrewtaylor/Windows-Automated-BambuStudio-Slicing-and-Convex-Hull-Baseplate
 2. **Extract the ZIP file** to your desired location (e.g., `C:\Users\YourName\Documents\`)
 
 ### Step 2: Open Terminal
