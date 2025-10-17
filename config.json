@@ -1,0 +1,6 @@
+{
+  "bambu_studio_path": "C:\\Program Files\\Bambu Studio\\bambu-studio.exe",
+  "platform": "Windows",
+  "python_executable": "venv\\Scripts\\python.exe",
+  "pip_executable": "venv\\Scripts\\pip.exe"
+}

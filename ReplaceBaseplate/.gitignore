@@ -1,0 +1,49 @@
+# G-code files
+*.gcode
+*.gcode.3mf
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+temp_*.gcode
+test_*.gcode
+verify_*.gcode
+check_*.gcode
+
+# Old/backup files
+*_old.py
+*_backup.py
+*_v2.py
+*_v3.py
+*_fixed.py
+*_FIXED.gcode.3mf
+*_RICKROLL.gcode.3mf
+*_PROGRESS_FIXED.gcode.3mf
+
+# STL files
+*.stl
+
+# 3MF model files (keep only the tool, not the models)
+*.3mf
+!README_Baseplate_Replacement_Complete.md
+!replace_baseplate_layers.py
