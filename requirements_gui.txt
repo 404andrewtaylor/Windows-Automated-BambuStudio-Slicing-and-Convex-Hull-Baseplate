@@ -1,0 +1,21 @@
+# GUI Application Requirements
+# Core GUI framework (usually included with Python)
+# tkinter - Built into Python standard library
+
+# Scientific computing
+numpy>=1.21.0
+scipy>=1.7.0
+matplotlib>=3.5.0
+
+# Windows automation dependencies
+pyautogui>=0.9.54
+pygetwindow>=0.0.9
+pywinauto>=0.6.8
+pywin32>=306
+pydirectinput>=1.0.4
+
+# STL file handling
+numpy-stl>=2.16.0
+
+# Additional utilities
+pathlib2>=2.3.7; python_version < "3.4"
