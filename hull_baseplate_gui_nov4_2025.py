@@ -415,9 +415,18 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
             self.folder_path_var.set(folder_path)
             self.input_folder_path = folder_path
             
-            # Count STL files in folder
+            # Count STL files in folder (remove duplicates - Windows is case-insensitive)
             stl_files = glob.glob(os.path.join(folder_path, "*.stl"))
             stl_files.extend(glob.glob(os.path.join(folder_path, "*.STL")))
+            # Remove duplicates (case-insensitive file systems can match same files twice)
+            # Use dictionary to preserve order while removing duplicates
+            unique_files = {}
+            for f in stl_files:
+                normalized = os.path.normpath(os.path.normcase(f))
+                if normalized not in unique_files:
+                    unique_files[normalized] = f
+            stl_files = list(unique_files.values())
+            stl_files.sort()  # Sort for consistent order
             count = len(stl_files)
             
             self.log(f"Selected input folder: {folder_path}")
@@ -598,9 +607,18 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
     
     def _process_folder(self):
         """Process all STL files in a folder sequentially."""
-        # Find all STL files in the input folder
+        # Find all STL files in the input folder (remove duplicates - Windows is case-insensitive)
         stl_files = glob.glob(os.path.join(self.input_folder_path, "*.stl"))
         stl_files.extend(glob.glob(os.path.join(self.input_folder_path, "*.STL")))
+        # Remove duplicates (case-insensitive file systems can match same files twice)
+        # Use dictionary to preserve order while removing duplicates
+        unique_files = {}
+        for f in stl_files:
+            normalized = os.path.normpath(os.path.normcase(f))
+            if normalized not in unique_files:
+                unique_files[normalized] = f
+        stl_files = list(unique_files.values())
+        stl_files.sort()  # Sort for consistent order
         
         if not stl_files:
             # Schedule messagebox in main thread
