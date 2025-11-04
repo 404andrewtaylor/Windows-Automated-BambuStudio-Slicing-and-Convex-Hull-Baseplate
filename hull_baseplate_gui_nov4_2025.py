@@ -803,18 +803,42 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
         except Exception as e:
             self.log(f"Error managing output files: {str(e)}")
     
+    def _verify_dependencies(self, venv_python):
+        """Verify that critical dependencies are installed in the venv."""
+        try:
+            # Check if pyautogui is installed
+            result = subprocess.run([venv_python, "-c", "import pyautogui"], 
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                self.log("Warning: pyautogui not found in venv, installing...")
+                venv_pip = os.path.join(os.path.dirname(venv_python), "pip.exe")
+                critical_packages = ["pyautogui", "pydirectinput", "numpy-stl"]
+                for package in critical_packages:
+                    self.log(f"Installing {package}...")
+                    subprocess.run([venv_pip, "install", package], 
+                                 capture_output=True, text=True)
+                return True
+            return True
+        except Exception as e:
+            self.log(f"Warning: Could not verify dependencies: {e}")
+            return False
+    
     def _get_python_executable(self, script_dir):
         """Get the appropriate Python executable (create venv if needed)."""
         # Check for virtual environment first
         venv_python = os.path.join(script_dir, "venv", "Scripts", "python.exe")
         if os.path.exists(venv_python):
             self.log(f"Using virtual environment Python: {venv_python}")
+            # Verify critical dependencies are installed
+            self._verify_dependencies(venv_python)
             return venv_python
         
         # Check for venv in current directory
         venv_python = os.path.join(os.getcwd(), "venv", "Scripts", "python.exe")
         if os.path.exists(venv_python):
             self.log(f"Using virtual environment Python: {venv_python}")
+            # Verify critical dependencies are installed
+            self._verify_dependencies(venv_python)
             return venv_python
         
         # Create virtual environment if it doesn't exist
@@ -863,8 +887,8 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
                     else:
                         self.log(f"Successfully installed {req_file}")
             
-            # Install additional packages
-            additional_packages = ["numpy-stl", "pydirectinput"]
+            # Install additional packages (critical for pipeline)
+            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32"]
             for package in additional_packages:
                 self.log(f"Installing {package}...")
                 result = subprocess.run([venv_pip, "install", package], 
