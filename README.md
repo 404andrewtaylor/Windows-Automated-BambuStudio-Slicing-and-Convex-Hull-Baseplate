@@ -13,11 +13,36 @@
 - **One-click output folder access**
 
 ### 🚀 Quick GUI Start
+
+**Original GUI Version:**
 1. **Double-click `launch_gui.bat`** (Windows)
 2. **Follow the on-screen instructions**
 3. **Complete Bambu Studio setup** as guided
 4. **Select your STL file and output folder**
 5. **Click "Run Pipeline" and wait for completion**
+
+**New GUI Version (Nov 4, 2025) - Enhanced Features:**
+1. **Double-click `launch_gui_nov4_2025.bat`** (Windows)
+2. **Follow the on-screen instructions**
+3. **Complete Bambu Studio setup** as guided
+4. **Choose input mode:**
+   - **Single STL File**: Process one file at a time
+   - **Input Folder**: Process all STL files in a folder sequentially
+5. **Configure output options:**
+   - **Auto-generate output folder**: Creates `{input_folder}\slicer_output` automatically
+   - **Manual output folder**: Choose your own output location
+   - **Create subfolders**: Option to organize files in subfolders or place directly in output
+6. **Click "Run Pipeline" and wait for completion**
+
+### 🆕 New GUI Version Features (Nov 4, 2025)
+
+The new GUI version includes enhanced capabilities:
+
+- **📁 Batch Processing**: Process entire folders of STL files sequentially
+- **🔧 Auto Output Folder**: Automatically creates output folder at `{input_folder}\slicer_output`
+- **📂 Flexible Organization**: Option to create subfolders for each file or place all files directly in output folder
+- **⚡ Sequential Processing**: Processes files one at a time, ensuring each completes before starting the next
+- **📊 Progress Tracking**: Shows current file number (e.g., "Processing file 2/5") during batch operations
 
 **See [README_GUI.md](README_GUI.md) for detailed GUI instructions.**
 
@@ -299,4 +324,5 @@ Your final printable file is `{model_name}_with_hull_baseplate.gcode.3mf` - load
 
 **Created:** October 14, 2025  
 **Pipeline Version:** 1.0  
+**GUI Version (Nov 4, 2025):** Enhanced with batch processing and auto output folder  
 **Tested on:** Windows with Bambu Studio
