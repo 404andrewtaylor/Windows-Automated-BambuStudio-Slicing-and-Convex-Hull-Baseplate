@@ -555,6 +555,14 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
         # Determine which Python to use (prefer virtual environment)
         python_exe = self._get_python_executable(script_dir)
         
+        # Verify dependencies are installed before processing
+        self.log("Verifying dependencies before processing...")
+        if not self._verify_dependencies(python_exe):
+            self.log("ERROR: Critical dependencies are missing. Pipeline may fail.")
+            # Schedule messagebox in main thread
+            self.root.after(0, lambda: messagebox.showwarning("Dependency Warning", 
+                "Some critical dependencies could not be installed.\nThe pipeline may fail. Check the log for details."))
+        
         # Prepare command
         cmd = [python_exe, pipeline_script, self.stl_file_path]
         
@@ -638,6 +646,14 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
         
         # Determine which Python to use (prefer virtual environment)
         python_exe = self._get_python_executable(script_dir)
+        
+        # Verify dependencies are installed before starting batch processing
+        self.log("Verifying dependencies before batch processing...")
+        if not self._verify_dependencies(python_exe):
+            self.log("ERROR: Critical dependencies are missing. Batch processing may fail.")
+            # Schedule messagebox in main thread
+            self.root.after(0, lambda: messagebox.showwarning("Dependency Warning", 
+                "Some critical dependencies could not be installed.\nBatch processing may fail. Check the log for details."))
         
         successful_files = 0
         failed_files = 0
@@ -806,19 +822,65 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
     def _verify_dependencies(self, venv_python):
         """Verify that critical dependencies are installed in the venv."""
         try:
-            # Check if pyautogui is installed
-            result = subprocess.run([venv_python, "-c", "import pyautogui"], 
-                                  capture_output=True, text=True)
-            if result.returncode != 0:
-                self.log("Warning: pyautogui not found in venv, installing...")
-                venv_pip = os.path.join(os.path.dirname(venv_python), "pip.exe")
-                critical_packages = ["pyautogui", "pydirectinput", "numpy-stl"]
-                for package in critical_packages:
-                    self.log(f"Installing {package}...")
-                    subprocess.run([venv_pip, "install", package], 
-                                 capture_output=True, text=True)
+            venv_pip = os.path.join(os.path.dirname(venv_python), "pip.exe")
+            
+            # Check if pip exists
+            if not os.path.exists(venv_pip):
+                self.log(f"Error: pip.exe not found at {venv_pip}")
+                return False
+            
+            # List of critical packages to check: (package_name, import_name)
+            # import_name is what you use in "import X", package_name is what you install with pip
+            critical_packages = [
+                ("pyautogui", "pyautogui"),
+                ("pydirectinput", "pydirectinput"),
+                ("numpy-stl", "stl"),  # numpy-stl provides the 'stl' module
+            ]
+            
+            missing_packages = []
+            
+            # Check each package individually
+            for package_name, import_name in critical_packages:
+                result = subprocess.run([venv_python, "-c", f"import {import_name}"], 
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode != 0:
+                    missing_packages.append((package_name, import_name))
+                    self.log(f"Warning: {import_name} module not found (from {package_name})")
+            
+            # Install any missing packages
+            if missing_packages:
+                self.log(f"Installing missing packages: {', '.join([p[0] for p in missing_packages])}...")
+                failed_installations = []
+                
+                for package_name, import_name in missing_packages:
+                    self.log(f"Installing {package_name}...")
+                    result = subprocess.run([venv_pip, "install", package_name], 
+                                         capture_output=True, text=True, timeout=120)
+                    if result.returncode != 0:
+                        self.log(f"Error: Failed to install {package_name}: {result.stderr}")
+                        failed_installations.append(package_name)
+                    else:
+                        # Verify installation succeeded by trying to import again
+                        verify_result = subprocess.run([venv_python, "-c", f"import {import_name}"], 
+                                                      capture_output=True, text=True, timeout=5)
+                        if verify_result.returncode == 0:
+                            self.log(f"Successfully installed and verified {package_name}")
+                        else:
+                            self.log(f"Warning: {package_name} installed but import still fails")
+                            failed_installations.append(package_name)
+                
+                if failed_installations:
+                    self.log(f"Error: Failed to install critical packages: {', '.join(failed_installations)}")
+                    return False
+                else:
+                    self.log("All missing packages installed successfully")
+                    return True
+            else:
+                self.log("All critical dependencies are installed")
                 return True
-            return True
+        except subprocess.TimeoutExpired:
+            self.log(f"Error: Timeout while verifying/installing dependencies")
+            return False
         except Exception as e:
             self.log(f"Warning: Could not verify dependencies: {e}")
             return False
