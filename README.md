@@ -67,7 +67,65 @@
 
 ---
 
-## 🚀 Command Line Usage
+## 💻 Command Line Interface (CLI)
+
+### 🎯 Batch Processing CLI (Nov 10, 2025) - **RECOMMENDED FOR CLI USERS**
+
+**Best for:** Users who prefer command-line interfaces or want to automate batch processing
+
+#### Quick Start
+
+**Windows Batch File:**
+```cmd
+batch_process_cli.bat "C:\Users\YourName\Documents\STL_Files"
+```
+
+**Direct Python:**
+```cmd
+python batch_process_cli.py "C:\Users\YourName\Documents\STL_Files"
+```
+
+#### What It Does
+
+The CLI version provides the same simplified functionality as the Nov 10 GUI version:
+
+1. **Deletes .3mf and .gcode.3mf files** from input folder (before processing)
+2. **Processes all STL files** in the folder sequentially
+3. **Saves final output** to `{input_folder}\slicer_output`
+4. **Deletes .3mf and .gcode.3mf files** again (after successful processing)
+5. **Only keeps final output files** (no intermediate files, no subfolders)
+
+#### Features
+
+- ✅ **Automatic dependency verification** - Checks and installs missing packages
+- ✅ **Automatic cleanup** - Deletes .3mf and .gcode.3mf files to prevent errors
+- ✅ **Batch processing** - Processes all STL files sequentially
+- ✅ **Progress output** - Shows detailed progress for each file
+- ✅ **Error handling** - Skips cleanup if processing fails
+- ✅ **No configuration** - Everything is automatic
+
+#### Example Usage
+
+```cmd
+# Navigate to pipeline folder
+cd "C:\Users\YourName\Documents\Windows-Automated-BambuStudio-Slicing-and-Convex-Hull-Baseplate-master"
+
+# Process all STL files in a folder
+batch_process_cli.bat "C:\Users\YourName\Documents\STL_Files"
+
+# Or use Python directly
+python batch_process_cli.py "C:\Users\YourName\Documents\STL_Files"
+```
+
+#### Output
+
+- **Output folder:** `{input_folder}\slicer_output`
+- **Files:** Only final `.gcode.3mf` files (one per STL file)
+- **Cleanup:** Input folder cleaned of .3mf and .gcode.3mf files (if successful)
+
+---
+
+## 🚀 Command Line Usage (Single File Processing)
 
 ### Prerequisites
 
@@ -132,7 +190,7 @@
 
 **Setup complete! You're ready to use the pipeline.**
 
-## 🚀 Running the Pipeline
+## 🚀 Running the Pipeline (Single File)
 
 ### Basic Usage
 1. **Open Command Prompt or PowerShell**
@@ -153,6 +211,8 @@ cd "C:\Users\YourName\Documents\Windows-Automated-BambuStudio-Slicing-and-Convex
 # Run the pipeline on your STL file
 venv\Scripts\python.exe full_pipeline.py "C:\Users\YourName\Documents\MyModel.stl"
 ```
+
+**Note:** For batch processing multiple files, use the **Batch Processing CLI** (see above) or the **Simplified GUI Version (Nov 10, 2025)**.
 
 ### Output Location
 The pipeline will create a folder named `{model_name}_pipeline` in the same directory as your input STL file.
@@ -347,4 +407,6 @@ Your final printable file is `{model_name}_with_hull_baseplate.gcode.3mf` - load
 - **Nov 4, 2025:** Most advanced version with full features and flexibility
 - **Nov 10, 2025:** Simplified version optimized for easy batch processing
 - **Original:** Obsolete, kept for compatibility only  
+**CLI Version:**
+- **Nov 10, 2025:** Batch Processing CLI - Command-line interface for simplified batch processing  
 **Tested on:** Windows with Bambu Studio

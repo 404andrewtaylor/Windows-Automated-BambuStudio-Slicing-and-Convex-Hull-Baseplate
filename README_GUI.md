@@ -2,6 +2,8 @@
 
 A user-friendly desktop application for the STL to Hull Baseplate Pipeline. This GUI makes it easy for anyone to create custom baseplates for their 3D prints without needing to use the command line.
 
+**💻 Prefer Command Line?** Check out the **Batch Processing CLI** (`batch_process_cli.py`) - it provides the same simplified functionality as the Nov 10 GUI version but runs from the terminal. See the main [README.md](README.md) for CLI usage.
+
 ## 📋 Available GUI Versions
 
 ### ⚠️ Version Comparison
