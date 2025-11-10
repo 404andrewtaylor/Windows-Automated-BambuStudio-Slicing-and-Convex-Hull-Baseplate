@@ -626,6 +626,7 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
                 ("pyautogui", "pyautogui"),
                 ("pydirectinput", "pydirectinput"),
                 ("numpy-stl", "stl"),  # numpy-stl provides the 'stl' module
+                ("shapely", "shapely"),  # shapely provides polygon buffer operations
             ]
             
             missing_packages = []
@@ -738,7 +739,7 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
                         self.log(f"Successfully installed {req_file}")
             
             # Install additional packages (critical for pipeline)
-            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32"]
+            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32", "shapely"]
             for package in additional_packages:
                 self.log(f"Installing {package}...")
                 result = subprocess.run([venv_pip, "install", package], 

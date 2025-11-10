@@ -83,6 +83,7 @@ def verify_dependencies(venv_python):
             ("pyautogui", "pyautogui"),
             ("pydirectinput", "pydirectinput"),
             ("numpy-stl", "stl"),  # numpy-stl provides the 'stl' module
+            ("shapely", "shapely"),  # shapely provides polygon buffer operations
         ]
         
         missing_packages = []
@@ -167,7 +168,7 @@ def create_virtual_environment(script_dir):
                     print(f"[OK] Successfully installed {req_file}")
         
         # Install additional packages (critical for pipeline)
-        additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32"]
+        additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32", "shapely"]
         for package in additional_packages:
             print(f"[INFO] Installing {package}...")
             result = subprocess.run([venv_pip, "install", package], 

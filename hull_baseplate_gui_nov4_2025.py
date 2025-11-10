@@ -835,6 +835,7 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
                 ("pyautogui", "pyautogui"),
                 ("pydirectinput", "pydirectinput"),
                 ("numpy-stl", "stl"),  # numpy-stl provides the 'stl' module
+                ("shapely", "shapely"),  # shapely provides polygon buffer operations
             ]
             
             missing_packages = []
@@ -950,7 +951,7 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
                         self.log(f"Successfully installed {req_file}")
             
             # Install additional packages (critical for pipeline)
-            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32"]
+            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32", "shapely"]
             for package in additional_packages:
                 self.log(f"Installing {package}...")
                 result = subprocess.run([venv_pip, "install", package], 

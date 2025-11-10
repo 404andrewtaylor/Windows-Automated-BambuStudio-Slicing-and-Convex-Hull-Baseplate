@@ -265,6 +265,78 @@ def compute_convex_hull(points):
     return None, np.array(hull_points)  # Return None for hull object, just the points
 
 
+def offset_hull(hull_points, buffer_mm=2.0):
+    """
+    Apply buffer/offset to convex hull polygon with safety checks.
+    Creates a uniform buffer around the hull with rounded corners.
+    
+    Args:
+        hull_points: numpy array of (x, y) points forming convex hull
+        buffer_mm: Buffer distance in mm (default: 2.0)
+    
+    Returns:
+        numpy array of buffered hull points
+    
+    Raises:
+        ValueError: If buffer operation fails or produces invalid geometry
+        ImportError: If Shapely is not installed
+    """
+    try:
+        from shapely.geometry import Polygon
+        
+        # Validate input
+        if len(hull_points) < 3:
+            raise ValueError(f"Need at least 3 points for hull, got {len(hull_points)}")
+        
+        # Convert numpy array to list of (x, y) tuples
+        coords = [(float(p[0]), float(p[1])) for p in hull_points]
+        
+        # Create Shapely Polygon
+        polygon = Polygon(coords)
+        
+        # Validate original polygon
+        if not polygon.is_valid:
+            print("[WARNING] Original hull polygon is invalid, attempting to fix...")
+            polygon = polygon.buffer(0)  # Fix invalid geometry
+            if not polygon.is_valid:
+                raise ValueError("Could not fix invalid hull polygon")
+        
+        # Apply buffer (outward expansion with rounded corners)
+        # Default behavior: rounded corners (cap_style=1, join_style=1)
+        buffered = polygon.buffer(buffer_mm)
+        
+        # Validate buffered geometry
+        if not buffered.is_valid:
+            print("[WARNING] Buffered polygon is invalid, attempting to fix...")
+            buffered = buffered.buffer(0)
+            if not buffered.is_valid:
+                raise ValueError("Buffered polygon is invalid and could not be fixed")
+        
+        # Handle different geometry types
+        if buffered.geom_type == 'Polygon':
+            # Extract exterior coordinates (remove duplicate last point)
+            buffered_coords = list(buffered.exterior.coords[:-1])
+        elif buffered.geom_type == 'MultiPolygon':
+            # Take the largest polygon (shouldn't happen for convex hull, but handle it)
+            print("[WARNING] Buffer produced MultiPolygon, using largest polygon")
+            largest = max(buffered.geoms, key=lambda p: p.area)
+            buffered_coords = list(largest.exterior.coords[:-1])
+        else:
+            raise ValueError(f"Unexpected geometry type: {buffered.geom_type}")
+        
+        # Validate output
+        if len(buffered_coords) < 3:
+            raise ValueError(f"Buffered hull has insufficient points: {len(buffered_coords)}")
+        
+        # Convert back to numpy array
+        return np.array(buffered_coords)
+        
+    except ImportError:
+        raise ImportError("Shapely is required for buffer operation. Install with: pip install shapely")
+    except Exception as e:
+        raise ValueError(f"Failed to apply buffer to hull: {str(e)}")
+
+
 def visualize_results(points, hull_points, output_dir):
     """Create a visualization of the first layer and its convex hull."""
     print("[ANALYSIS] Creating visualization...")
