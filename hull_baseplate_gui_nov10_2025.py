@@ -87,17 +87,75 @@ class HullBaseplateApp:
                 pass
         return {}
     
+    def create_scrollable_frame(self, parent):
+        """
+        Create a scrollable frame with canvas and scrollbars.
+        Returns the inner frame where content should be placed.
+        """
+        # Create canvas with scrollbars
+        canvas = tk.Canvas(parent)
+        scrollbar_v = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        scrollbar_h = ttk.Scrollbar(parent, orient="horizontal", command=canvas.xview)
+        
+        # Inner frame that will hold all content
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # Configure canvas scrolling
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        # Create window in canvas for the scrollable frame
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        
+        # Configure canvas scroll command
+        canvas.configure(yscrollcommand=scrollbar_v.set, xscrollcommand=scrollbar_h.set)
+        
+        # Pack scrollbars and canvas
+        scrollbar_v.pack(side="right", fill="y")
+        scrollbar_h.pack(side="bottom", fill="x")
+        canvas.pack(side="left", fill="both", expand=True)
+        
+        # Bind mousewheel to canvas (Windows)
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        # Bind mousewheel for different platforms
+        canvas.bind("<MouseWheel>", on_mousewheel)  # Windows
+        canvas.bind("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))  # Linux
+        canvas.bind("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))  # Linux
+        
+        # Update scroll region when content changes
+        def update_scroll_region(event=None):
+            canvas.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        # Make canvas window expand to fill canvas width
+        def on_canvas_configure(event):
+            canvas_width = event.width
+            canvas.itemconfig(canvas_window, width=canvas_width)
+        
+        canvas.bind("<Configure>", on_canvas_configure)
+        
+        return scrollable_frame, canvas
+    
     def create_setup_page(self):
         """Create the Bambu Studio setup instructions page with deletion warning."""
         setup_frame = ttk.Frame(self.notebook)
         self.notebook.add(setup_frame, text="1. Setup")
         
+        # Create scrollable frame
+        scrollable_frame, canvas = self.create_scrollable_frame(setup_frame)
+        
         # Title
-        title_label = ttk.Label(setup_frame, text="Bambu Studio Setup", font=("Arial", 16, "bold"))
+        title_label = ttk.Label(scrollable_frame, text="Bambu Studio Setup", font=("Arial", 16, "bold"))
         title_label.pack(pady=(20, 10))
         
         # Instructions container
-        instructions_frame = ttk.Frame(setup_frame)
+        instructions_frame = ttk.Frame(scrollable_frame)
         instructions_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # ⚠️ PROMINENT WARNING AT TOP
@@ -189,12 +247,15 @@ Once you've completed these steps, click "Next" to continue.
         file_frame = ttk.Frame(self.notebook)
         self.notebook.add(file_frame, text="2. Select Folder")
         
+        # Create scrollable frame
+        scrollable_frame, canvas = self.create_scrollable_frame(file_frame)
+        
         # Title
-        title_label = ttk.Label(file_frame, text="Select Input Folder", font=("Arial", 16, "bold"))
+        title_label = ttk.Label(scrollable_frame, text="Select Input Folder", font=("Arial", 16, "bold"))
         title_label.pack(pady=(20, 10))
         
         # Main content frame
-        content_frame = ttk.Frame(file_frame)
+        content_frame = ttk.Frame(scrollable_frame)
         content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # Input folder selection
