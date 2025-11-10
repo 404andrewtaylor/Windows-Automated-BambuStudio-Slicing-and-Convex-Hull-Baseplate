@@ -101,6 +101,11 @@ def check_for_updates():
             if not download_url and len(data['assets']) > 0:
                 download_url = data['assets'][0].get('browser_download_url')
         
+        # Fallback: Use GitHub's automatic source code ZIP if no assets found
+        # GitHub always provides zipball_url for source code archives
+        if not download_url and 'zipball_url' in data:
+            download_url = data['zipball_url']
+        
         # Compare versions
         version_comparison = compare_versions(current_version, latest_version)
         update_available = version_comparison < 0
