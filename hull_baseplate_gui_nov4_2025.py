@@ -22,6 +22,7 @@ from pathlib import Path
 import json
 import shutil
 import glob
+from auto_update import check_for_updates, perform_update, get_current_version
 
 class HullBaseplateApp:
     def __init__(self, root):
@@ -71,8 +72,174 @@ class HullBaseplateApp:
         self.status_bar = ttk.Label(self.main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         self.status_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
+        # Add Help menu with Check for Updates
+        self.create_menu_bar()
+        
         # Start with setup page
         self.notebook.select(0)
+    
+    def create_menu_bar(self):
+        """Create menu bar with Help menu including Check for Updates."""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="Check for Updates", command=self.check_for_updates)
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=self.show_about)
+    
+    def show_about(self):
+        """Show about dialog with version information."""
+        current_version = get_current_version()
+        about_text = f"""Hull Baseplate Pipeline (Nov 4, 2025 - Advanced)
+
+Version: {current_version}
+
+A full-featured desktop application for the STL to Hull Baseplate Pipeline.
+Provides an intuitive interface for setting up Bambu Studio and running the pipeline.
+
+© 2025"""
+        messagebox.showinfo("About", about_text)
+    
+    def check_for_updates(self):
+        """Check for updates from GitHub."""
+        self.log("Checking for updates...")
+        self.status_var.set("Checking for updates...")
+        
+        # Run update check in separate thread
+        update_thread = threading.Thread(target=self._check_for_updates_thread)
+        update_thread.daemon = True
+        update_thread.start()
+    
+    def _check_for_updates_thread(self):
+        """Check for updates in background thread."""
+        try:
+            result = check_for_updates()
+            
+            if result is None:
+                self.root.after(0, lambda: messagebox.showerror("Update Check Failed", 
+                    "Could not check for updates. Please check your internet connection."))
+                self.root.after(0, lambda: self.status_var.set("Ready"))
+                return
+            
+            current_version = result['current_version']
+            latest_version = result['latest_version']
+            update_available = result['available']
+            
+            if update_available:
+                # Show update dialog
+                self.root.after(0, lambda: self._show_update_dialog(result))
+            else:
+                self.root.after(0, lambda: messagebox.showinfo("No Updates Available", 
+                    f"You are running the latest version ({current_version})."))
+                self.root.after(0, lambda: self.status_var.set("Ready"))
+                
+        except Exception as e:
+            self.log(f"Error checking for updates: {e}")
+            self.root.after(0, lambda: messagebox.showerror("Update Check Failed", 
+                f"Error checking for updates: {str(e)}"))
+            self.root.after(0, lambda: self.status_var.set("Ready"))
+    
+    def _show_update_dialog(self, update_info):
+        """Show update available dialog."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Update Available")
+        dialog.geometry("600x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Title
+        title_label = ttk.Label(dialog, text="Update Available!", font=("Arial", 14, "bold"))
+        title_label.pack(pady=10)
+        
+        # Version info
+        version_frame = ttk.Frame(dialog)
+        version_frame.pack(pady=10)
+        ttk.Label(version_frame, text=f"Current Version: {update_info['current_version']}").pack()
+        ttk.Label(version_frame, text=f"Latest Version: {update_info['latest_version']}").pack()
+        
+        # Release notes
+        notes_label = ttk.Label(dialog, text="Release Notes:", font=("Arial", 10, "bold"))
+        notes_label.pack(pady=(10, 5))
+        
+        notes_text = scrolledtext.ScrolledText(dialog, height=10, width=70, wrap=tk.WORD)
+        notes_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+        notes_text.insert("1.0", update_info.get('release_notes', 'No release notes available.'))
+        notes_text.config(state=tk.DISABLED)
+        
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=10)
+        
+        def on_update():
+            dialog.destroy()
+            self._perform_update(update_info)
+        
+        ttk.Button(button_frame, text="Update Now", command=on_update).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Later", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def _perform_update(self, update_info):
+        """Perform the update process."""
+        if not update_info.get('download_url'):
+            messagebox.showerror("Update Failed", "No download URL available for this update.")
+            return
+        
+        # Confirm update
+        response = messagebox.askyesno("Confirm Update", 
+            "This will download and install the update.\n"
+            "A backup will be created automatically.\n\n"
+            "Continue?")
+        if not response:
+            return
+        
+        # Go to progress page and show update progress
+        self.go_to_progress()
+        self.log_text.delete(1.0, tk.END)
+        self.log("Starting update process...")
+        self.status_var.set("Updating...")
+        
+        # Run update in separate thread
+        update_thread = threading.Thread(target=self._perform_update_thread, args=(update_info,))
+        update_thread.daemon = True
+        update_thread.start()
+    
+    def _perform_update_thread(self, update_info):
+        """Perform update in background thread."""
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            download_url = update_info['download_url']
+            
+            def log_callback(msg):
+                self.log(msg)
+            
+            self.log(f"Downloading update from GitHub...")
+            result = perform_update(download_url, script_dir, log_callback=log_callback, new_version=update_info['latest_version'])
+            
+            if result['success']:
+                self.log("Update completed successfully!")
+                self.root.after(0, lambda: messagebox.showinfo("Update Complete", 
+                    "Update installed successfully!\n\nPlease restart the application to use the new version."))
+                self.root.after(0, lambda: self.status_var.set("Update complete - Please restart"))
+            else:
+                self.log(f"Update failed: {result.get('error_message', 'Unknown error')}")
+                self.root.after(0, lambda: messagebox.showerror("Update Failed", 
+                    f"Update failed: {result.get('error_message', 'Unknown error')}\n\n"
+                    f"Your previous version has been restored from backup."))
+                self.root.after(0, lambda: self.status_var.set("Update failed"))
+                
+        except Exception as e:
+            self.log(f"Error during update: {e}")
+            self.root.after(0, lambda: messagebox.showerror("Update Error", 
+                f"An error occurred during update: {str(e)}"))
+            self.root.after(0, lambda: self.status_var.set("Update error"))
     
     def load_config(self):
         """Load configuration from config.json if it exists."""

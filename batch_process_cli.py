@@ -16,6 +16,7 @@ import glob
 import shutil
 import time
 from pathlib import Path
+from auto_update import check_for_updates, get_current_version
 
 
 def get_script_directory():
@@ -401,11 +402,45 @@ def process_folder(input_folder):
         return False
 
 
+def check_updates_command():
+    """Handle --check-updates command."""
+    print("=" * 60)
+    print("Checking for updates...")
+    print("=" * 60)
+    
+    current_version = get_current_version()
+    print(f"[INFO] Current version: {current_version}")
+    
+    result = check_for_updates()
+    if result is None:
+        print("[ERROR] Failed to check for updates. Please check your internet connection.")
+        sys.exit(1)
+    
+    if result['available']:
+        print(f"[INFO] Update available!")
+        print(f"[INFO] Latest version: {result['latest_version']}")
+        print(f"[INFO] Release name: {result['release_name']}")
+        print(f"[INFO] Release notes:")
+        print(result.get('release_notes', 'No release notes available.'))
+        print("")
+        print("[INFO] To update, use the GUI version or download manually from GitHub.")
+        print(f"[INFO] Download URL: {result.get('download_url', 'N/A')}")
+    else:
+        print(f"[INFO] You are running the latest version ({current_version}).")
+    
+    sys.exit(0)
+
+
 def main():
     """Main function."""
+    # Check for --check-updates flag
+    if len(sys.argv) == 2 and sys.argv[1] == "--check-updates":
+        check_updates_command()
+    
     if len(sys.argv) != 2:
         print("[ERROR] Please provide an input folder path")
         print("Usage: python batch_process_cli.py <input_folder>")
+        print("       python batch_process_cli.py --check-updates")
         print("Example: python batch_process_cli.py \"C:\\Users\\YourName\\Documents\\STL_Files\"")
         sys.exit(1)
     

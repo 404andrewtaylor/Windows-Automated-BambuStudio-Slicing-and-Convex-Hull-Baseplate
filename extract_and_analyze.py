@@ -267,17 +267,18 @@ def compute_convex_hull(points):
 
 def offset_hull(hull_points, buffer_mm=2.0):
     """
-    Apply buffer/offset to convex hull polygon using manual algorithm (no Shapely required).
-    Creates a uniform buffer around the hull with rounded corners.
+    Apply buffer/offset to convex hull by scaling it up from its center.
+    Ensures the edge of the scaled hull is at least buffer_mm away from the original edge.
     
     Algorithm:
-    1. For each edge, calculate the outward normal vector
-    2. Move each vertex outward along the normal by buffer_mm
-    3. Handle corners by creating rounded arcs
+    1. Calculate the center of the hull
+    2. Find the minimum distance from center to any vertex (closest point)
+    3. Scale all points outward from center by a factor that ensures at least buffer_mm distance
+    4. This guarantees at least buffer_mm minimum distance everywhere
     
     Args:
         hull_points: numpy array of (x, y) points forming convex hull
-        buffer_mm: Buffer distance in mm (default: 2.0)
+        buffer_mm: Minimum buffer distance in mm (default: 2.0)
     
     Returns:
         numpy array of buffered hull points
@@ -292,79 +293,27 @@ def offset_hull(hull_points, buffer_mm=2.0):
     # Ensure hull_points is a numpy array
     hull_points = np.array(hull_points, dtype=np.float64)
     
-    # Number of points
-    n = len(hull_points)
+    # Calculate the center of the hull (centroid)
+    center = np.mean(hull_points, axis=0)
     
-    # Calculate outward normals for each edge
-    # For a convex hull, we need to move each vertex outward
-    # We'll calculate the normal for each edge and offset vertices accordingly
+    # Calculate distance from center to each vertex
+    distances_from_center = np.array([np.linalg.norm(point - center) for point in hull_points])
     
-    offset_points = []
+    # Find the minimum distance (closest point to center)
+    min_distance = np.min(distances_from_center)
     
-    for i in range(n):
-        # Get current, previous, and next points
-        prev_idx = (i - 1) % n
-        curr_idx = i
-        next_idx = (i + 1) % n
-        
-        p_prev = hull_points[prev_idx]
-        p_curr = hull_points[curr_idx]
-        p_next = hull_points[next_idx]
-        
-        # Calculate edge vectors
-        edge1 = p_curr - p_prev  # Edge from prev to curr
-        edge2 = p_next - p_curr  # Edge from curr to next
-        
-        # Normalize edge vectors
-        norm1 = np.linalg.norm(edge1)
-        norm2 = np.linalg.norm(edge2)
-        
-        if norm1 < 1e-10 or norm2 < 1e-10:
-            # Degenerate edge, skip offset
-            offset_points.append(p_curr)
-            continue
-        
-        edge1_unit = edge1 / norm1
-        edge2_unit = edge2 / norm2
-        
-        # Calculate outward normals (rotate 90 degrees counterclockwise)
-        # For 2D: (x, y) -> (-y, x) rotates 90 degrees CCW
-        normal1 = np.array([-edge1_unit[1], edge1_unit[0]])
-        normal2 = np.array([-edge2_unit[1], edge2_unit[0]])
-        
-        # Average the two normals to get the direction for this vertex
-        # This creates rounded corners
-        avg_normal = (normal1 + normal2) / 2.0
-        avg_normal_norm = np.linalg.norm(avg_normal)
-        
-        if avg_normal_norm < 1e-10:
-            # Normals are opposite (180 degree corner), use one of them
-            avg_normal = normal1
-            avg_normal_norm = 1.0
-        
-        avg_normal_unit = avg_normal / avg_normal_norm
-        
-        # Calculate the offset distance accounting for the angle
-        # For a corner with angle theta, the offset distance needs to be adjusted
-        # by 1/sin(theta/2) to maintain uniform distance from edges
-        cos_angle = np.dot(edge1_unit, edge2_unit)
-        cos_angle = np.clip(cos_angle, -1.0, 1.0)  # Clamp to valid range
-        angle = np.arccos(cos_angle)
-        half_angle = angle / 2.0
-        
-        if abs(half_angle) < 1e-10:
-            # Nearly straight line, use simple offset
-            offset_distance = buffer_mm
-        else:
-            # Adjust offset distance for corner
-            offset_distance = buffer_mm / np.sin(half_angle)
-        
-        # Offset the vertex
-        offset_vertex = p_curr + avg_normal_unit * offset_distance
-        offset_points.append(offset_vertex)
+    if min_distance < 1e-10:
+        # Degenerate case: all points at center
+        raise ValueError("Hull is degenerate (all points at center)")
     
-    # Convert back to numpy array
-    buffered_points = np.array(offset_points)
+    # Calculate scale factor to ensure at least buffer_mm distance
+    # If the closest point is at distance d from center, we need to scale it to (d + buffer_mm)
+    # Scale factor = (d + buffer_mm) / d = 1 + buffer_mm / d
+    scale_factor = 1.0 + (buffer_mm / min_distance)
+    
+    # Scale all points outward from center
+    # For each point: new_point = center + (point - center) * scale_factor
+    buffered_points = center + (hull_points - center) * scale_factor
     
     # Validate output
     if len(buffered_points) < 3:
