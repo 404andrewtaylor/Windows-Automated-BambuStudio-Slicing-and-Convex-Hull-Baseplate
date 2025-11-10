@@ -78,30 +78,33 @@ def verify_dependencies(venv_python):
             print(f"[ERROR] pip.exe not found at {venv_pip}")
             return False
         
-        # List of critical packages to check: (package_name, import_name)
+        # List of critical packages to check: (package_name, import_test_command)
+        # import_test_command is the Python code to test the import
         critical_packages = [
-            ("pyautogui", "pyautogui"),
-            ("pydirectinput", "pydirectinput"),
-            ("numpy-stl", "stl"),  # numpy-stl provides the 'stl' module
-            ("shapely", "shapely"),  # shapely provides polygon buffer operations
+            ("pyautogui", "import pyautogui"),
+            ("pydirectinput", "import pydirectinput"),
+            ("numpy-stl", "import stl"),  # numpy-stl provides the 'stl' module
+            ("shapely", "from shapely.geometry import Polygon"),  # shapely - test with actual import we use
         ]
         
         missing_packages = []
         
         # Check each package individually
-        for package_name, import_name in critical_packages:
-            result = subprocess.run([venv_python, "-c", f"import {import_name}"], 
+        for package_name, import_test in critical_packages:
+            result = subprocess.run([venv_python, "-c", import_test], 
                                   capture_output=True, text=True, timeout=5)
             if result.returncode != 0:
-                missing_packages.append((package_name, import_name))
-                print(f"[WARNING] {import_name} module not found (from {package_name})")
+                missing_packages.append((package_name, import_test))
+                print(f"[WARNING] {package_name} module not found or import failed")
+                if result.stderr:
+                    print(f"  Import error: {result.stderr.strip()}")
         
         # Install any missing packages
         if missing_packages:
             print(f"[INFO] Installing missing packages: {', '.join([p[0] for p in missing_packages])}...")
             failed_installations = []
             
-            for package_name, import_name in missing_packages:
+            for package_name, import_test in missing_packages:
                 print(f"[INFO] Installing {package_name}...")
                 result = subprocess.run([venv_pip, "install", package_name], 
                                      capture_output=True, text=True, timeout=120)
@@ -109,13 +112,29 @@ def verify_dependencies(venv_python):
                     print(f"[ERROR] Failed to install {package_name}: {result.stderr}")
                     failed_installations.append(package_name)
                 else:
+                    # Wait a moment for installation to complete
+                    import time
+                    time.sleep(1)
                     # Verify installation succeeded by trying to import again
-                    verify_result = subprocess.run([venv_python, "-c", f"import {import_name}"], 
-                                                  capture_output=True, text=True, timeout=5)
+                    verify_result = subprocess.run([venv_python, "-c", import_test], 
+                                                  capture_output=True, text=True, timeout=10)
                     if verify_result.returncode == 0:
                         print(f"[OK] Successfully installed and verified {package_name}")
                     else:
-                        print(f"[WARNING] {package_name} installed but import still fails")
+                        error_msg = verify_result.stderr.strip() if verify_result.stderr else "Unknown error"
+                        print(f"[WARNING] {package_name} installed but import still fails: {error_msg}")
+                        # For Shapely, try installing with --no-cache-dir or check for binary dependencies
+                        if package_name == "shapely":
+                            print(f"[INFO] Attempting to reinstall {package_name} with --no-cache-dir...")
+                            retry_result = subprocess.run([venv_pip, "install", "--no-cache-dir", "--force-reinstall", package_name], 
+                                                        capture_output=True, text=True, timeout=120)
+                            if retry_result.returncode == 0:
+                                time.sleep(1)
+                                retry_verify = subprocess.run([venv_python, "-c", import_test], 
+                                                             capture_output=True, text=True, timeout=10)
+                                if retry_verify.returncode == 0:
+                                    print(f"[OK] Successfully installed and verified {package_name} after retry")
+                                    continue
                         failed_installations.append(package_name)
             
             if failed_installations:
