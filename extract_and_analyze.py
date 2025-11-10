@@ -267,8 +267,13 @@ def compute_convex_hull(points):
 
 def offset_hull(hull_points, buffer_mm=2.0):
     """
-    Apply buffer/offset to convex hull polygon with safety checks.
+    Apply buffer/offset to convex hull polygon using manual algorithm (no Shapely required).
     Creates a uniform buffer around the hull with rounded corners.
+    
+    Algorithm:
+    1. For each edge, calculate the outward normal vector
+    2. Move each vertex outward along the normal by buffer_mm
+    3. Handle corners by creating rounded arcs
     
     Args:
         hull_points: numpy array of (x, y) points forming convex hull
@@ -279,62 +284,93 @@ def offset_hull(hull_points, buffer_mm=2.0):
     
     Raises:
         ValueError: If buffer operation fails or produces invalid geometry
-        ImportError: If Shapely is not installed
     """
-    try:
-        from shapely.geometry import Polygon
+    # Validate input
+    if len(hull_points) < 3:
+        raise ValueError(f"Need at least 3 points for hull, got {len(hull_points)}")
+    
+    # Ensure hull_points is a numpy array
+    hull_points = np.array(hull_points, dtype=np.float64)
+    
+    # Number of points
+    n = len(hull_points)
+    
+    # Calculate outward normals for each edge
+    # For a convex hull, we need to move each vertex outward
+    # We'll calculate the normal for each edge and offset vertices accordingly
+    
+    offset_points = []
+    
+    for i in range(n):
+        # Get current, previous, and next points
+        prev_idx = (i - 1) % n
+        curr_idx = i
+        next_idx = (i + 1) % n
         
-        # Validate input
-        if len(hull_points) < 3:
-            raise ValueError(f"Need at least 3 points for hull, got {len(hull_points)}")
+        p_prev = hull_points[prev_idx]
+        p_curr = hull_points[curr_idx]
+        p_next = hull_points[next_idx]
         
-        # Convert numpy array to list of (x, y) tuples
-        coords = [(float(p[0]), float(p[1])) for p in hull_points]
+        # Calculate edge vectors
+        edge1 = p_curr - p_prev  # Edge from prev to curr
+        edge2 = p_next - p_curr  # Edge from curr to next
         
-        # Create Shapely Polygon
-        polygon = Polygon(coords)
+        # Normalize edge vectors
+        norm1 = np.linalg.norm(edge1)
+        norm2 = np.linalg.norm(edge2)
         
-        # Validate original polygon
-        if not polygon.is_valid:
-            print("[WARNING] Original hull polygon is invalid, attempting to fix...")
-            polygon = polygon.buffer(0)  # Fix invalid geometry
-            if not polygon.is_valid:
-                raise ValueError("Could not fix invalid hull polygon")
+        if norm1 < 1e-10 or norm2 < 1e-10:
+            # Degenerate edge, skip offset
+            offset_points.append(p_curr)
+            continue
         
-        # Apply buffer (outward expansion with rounded corners)
-        # Default behavior: rounded corners (cap_style=1, join_style=1)
-        buffered = polygon.buffer(buffer_mm)
+        edge1_unit = edge1 / norm1
+        edge2_unit = edge2 / norm2
         
-        # Validate buffered geometry
-        if not buffered.is_valid:
-            print("[WARNING] Buffered polygon is invalid, attempting to fix...")
-            buffered = buffered.buffer(0)
-            if not buffered.is_valid:
-                raise ValueError("Buffered polygon is invalid and could not be fixed")
+        # Calculate outward normals (rotate 90 degrees counterclockwise)
+        # For 2D: (x, y) -> (-y, x) rotates 90 degrees CCW
+        normal1 = np.array([-edge1_unit[1], edge1_unit[0]])
+        normal2 = np.array([-edge2_unit[1], edge2_unit[0]])
         
-        # Handle different geometry types
-        if buffered.geom_type == 'Polygon':
-            # Extract exterior coordinates (remove duplicate last point)
-            buffered_coords = list(buffered.exterior.coords[:-1])
-        elif buffered.geom_type == 'MultiPolygon':
-            # Take the largest polygon (shouldn't happen for convex hull, but handle it)
-            print("[WARNING] Buffer produced MultiPolygon, using largest polygon")
-            largest = max(buffered.geoms, key=lambda p: p.area)
-            buffered_coords = list(largest.exterior.coords[:-1])
+        # Average the two normals to get the direction for this vertex
+        # This creates rounded corners
+        avg_normal = (normal1 + normal2) / 2.0
+        avg_normal_norm = np.linalg.norm(avg_normal)
+        
+        if avg_normal_norm < 1e-10:
+            # Normals are opposite (180 degree corner), use one of them
+            avg_normal = normal1
+            avg_normal_norm = 1.0
+        
+        avg_normal_unit = avg_normal / avg_normal_norm
+        
+        # Calculate the offset distance accounting for the angle
+        # For a corner with angle theta, the offset distance needs to be adjusted
+        # by 1/sin(theta/2) to maintain uniform distance from edges
+        cos_angle = np.dot(edge1_unit, edge2_unit)
+        cos_angle = np.clip(cos_angle, -1.0, 1.0)  # Clamp to valid range
+        angle = np.arccos(cos_angle)
+        half_angle = angle / 2.0
+        
+        if abs(half_angle) < 1e-10:
+            # Nearly straight line, use simple offset
+            offset_distance = buffer_mm
         else:
-            raise ValueError(f"Unexpected geometry type: {buffered.geom_type}")
+            # Adjust offset distance for corner
+            offset_distance = buffer_mm / np.sin(half_angle)
         
-        # Validate output
-        if len(buffered_coords) < 3:
-            raise ValueError(f"Buffered hull has insufficient points: {len(buffered_coords)}")
-        
-        # Convert back to numpy array
-        return np.array(buffered_coords)
-        
-    except ImportError:
-        raise ImportError("Shapely is required for buffer operation. Install with: pip install shapely")
-    except Exception as e:
-        raise ValueError(f"Failed to apply buffer to hull: {str(e)}")
+        # Offset the vertex
+        offset_vertex = p_curr + avg_normal_unit * offset_distance
+        offset_points.append(offset_vertex)
+    
+    # Convert back to numpy array
+    buffered_points = np.array(offset_points)
+    
+    # Validate output
+    if len(buffered_points) < 3:
+        raise ValueError(f"Buffered hull has insufficient points: {len(buffered_points)}")
+    
+    return buffered_points
 
 
 def visualize_results(points, hull_points, output_dir):

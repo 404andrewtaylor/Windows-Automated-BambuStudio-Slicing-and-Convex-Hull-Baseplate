@@ -688,7 +688,6 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
                 ("pyautogui", "import pyautogui"),
                 ("pydirectinput", "import pydirectinput"),
                 ("numpy-stl", "import stl"),  # numpy-stl provides the 'stl' module
-                ("shapely", "from shapely.geometry import Polygon"),  # shapely - test with actual import we use
             ]
             
             missing_packages = []
@@ -727,60 +726,6 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
                         else:
                             error_msg = verify_result.stderr.strip() if verify_result.stderr else "Unknown error"
                             self.log(f"Warning: {package_name} installed but import still fails: {error_msg}")
-                            # For Shapely on Windows, try multiple installation methods
-                            if package_name == "shapely":
-                                self.log(f"Attempting Windows-specific installation methods for {package_name}...")
-                                
-                                # Method 1: Try with --only-binary to force wheel installation
-                                self.log(f"Method 1: Installing with --only-binary (pre-built wheels)...")
-                                retry_result = subprocess.run([venv_pip, "install", "--only-binary", ":all:", "--upgrade", "--force-reinstall", package_name], 
-                                                            capture_output=True, text=True, timeout=120)
-                                if retry_result.returncode == 0:
-                                    time.sleep(2)
-                                    retry_verify = subprocess.run([venv_python, "-c", import_test], 
-                                                                 capture_output=True, text=True, timeout=10)
-                                    if retry_verify.returncode == 0:
-                                        self.log(f"Successfully installed and verified {package_name} with pre-built wheels")
-                                        continue
-                                
-                                # Method 2: Try upgrading pip first, then install
-                                self.log(f"Method 2: Upgrading pip, then installing {package_name}...")
-                                upgrade_pip = subprocess.run([venv_pip, "install", "--upgrade", "pip"], 
-                                                           capture_output=True, text=True, timeout=60)
-                                if upgrade_pip.returncode == 0:
-                                    time.sleep(1)
-                                    retry_result = subprocess.run([venv_pip, "install", "--prefer-binary", package_name], 
-                                                                capture_output=True, text=True, timeout=120)
-                                    if retry_result.returncode == 0:
-                                        time.sleep(2)
-                                        retry_verify = subprocess.run([venv_python, "-c", import_test], 
-                                                                     capture_output=True, text=True, timeout=10)
-                                        if retry_verify.returncode == 0:
-                                            self.log(f"Successfully installed and verified {package_name} after pip upgrade")
-                                            continue
-                                
-                                # Method 3: Try installing specific version known to work on Windows
-                                self.log(f"Method 3: Trying specific Windows-compatible version...")
-                                retry_result = subprocess.run([venv_pip, "install", "shapely==2.0.1", "--only-binary", ":all:"], 
-                                                            capture_output=True, text=True, timeout=120)
-                                if retry_result.returncode == 0:
-                                    time.sleep(2)
-                                    retry_verify = subprocess.run([venv_python, "-c", import_test], 
-                                                                 capture_output=True, text=True, timeout=10)
-                                    if retry_verify.returncode == 0:
-                                        self.log(f"Successfully installed and verified {package_name} version 2.0.1")
-                                        continue
-                                
-                                # If all methods fail, provide manual installation instructions
-                                self.log(f"ERROR: All automatic installation methods failed for {package_name}")
-                                self.log(f"Manual installation required:")
-                                self.log(f"  1. Open Command Prompt as Administrator")
-                                self.log(f"  2. Navigate to: {os.path.dirname(venv_python)}")
-                                self.log(f"  3. Run: pip install --upgrade pip")
-                                self.log(f"  4. Run: pip install --only-binary :all: shapely")
-                                self.log(f"  5. If that fails, try: pip install shapely==2.0.1")
-                                self.log(f"  6. Or download wheel from: https://www.lfd.uci.edu/~gohlke/pythonlibs/#shapely")
-                                
                             failed_installations.append(package_name)
                 
                 if failed_installations:
@@ -861,7 +806,7 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
                         self.log(f"Successfully installed {req_file}")
             
             # Install additional packages (critical for pipeline)
-            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32", "shapely"]
+            additional_packages = ["numpy-stl", "pydirectinput", "pyautogui", "pygetwindow", "pywinauto", "pywin32"]
             for package in additional_packages:
                 self.log(f"Installing {package}...")
                 result = subprocess.run([venv_pip, "install", package], 

@@ -53,10 +53,11 @@ def main():
             buffered_hull_points = offset_hull(hull_points, buffer_mm=2.0)
             print(f"[OK] Buffer applied successfully. Buffered hull has {len(buffered_hull_points)} vertices (original: {len(hull_points)})")
             aligned_hull_points = buffered_hull_points
+            buffer_applied = True
         except Exception as e:
-            print(f"[WARNING] Failed to apply buffer: {e}")
-            print("[WARNING] Using original hull without buffer")
-            aligned_hull_points = hull_points
+            print(f"[ERROR] Failed to apply buffer: {e}")
+            print("[ERROR] Cannot proceed without buffer. Please check hull points.")
+            raise
         
         # Step 4: Create STL
         print("[CREATE] Step 4: Creating extruded STL...")
