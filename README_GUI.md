@@ -4,26 +4,59 @@ A user-friendly desktop application for the STL to Hull Baseplate Pipeline. This
 
 ## 📋 Available GUI Versions
 
-### Original GUI Version
-- **File:** `hull_baseplate_gui.py`
-- **Launcher:** `launch_gui.bat` or `run_gui.py`
-- **Features:** Single STL file processing with manual output folder selection
+### ⚠️ Version Comparison
 
-### Enhanced GUI Version (Nov 4, 2025) - **RECOMMENDED**
-- **File:** `hull_baseplate_gui_nov4_2025.py`
-- **Launcher:** `launch_gui_nov4_2025.bat` or `run_gui_nov4_2025.py`
-- **Features:** 
-  - Single STL file OR folder batch processing
-  - Automatic output folder generation
-  - Flexible file organization options
-  - Sequential batch processing with progress tracking
+| Version | Status | Best For | Complexity |
+|---------|--------|----------|------------|
+| **Nov 10, 2025** | **RECOMMENDED** | Most users, batch processing | ⭐ Simple |
+| **Nov 4, 2025** | **MOST ADVANCED** | Power users, full control | ⭐⭐⭐ Advanced |
+| **Original** | **OBSOLETE** | Legacy compatibility only | ⭐⭐ Basic |
+
+### 🎯 Simplified GUI Version (Nov 10, 2025) - **RECOMMENDED FOR MOST USERS**
+
+**File:** `hull_baseplate_gui_nov10_2025.py`  
+**Launcher:** `launch_gui_nov10_2025.bat` or `run_gui_nov10_2025.py`
+
+**Features:**
+- ✅ **Simplified interface** - Only asks for input folder
+- ✅ **Automatic batch processing** - Processes all STL files in folder
+- ✅ **Automatic output folder** - Creates `{input_folder}\slicer_output`
+- ✅ **Automatic cleanup** - Deletes .3mf and .gcode.3mf files to prevent errors
+- ✅ **No configuration** - Everything is automatic
+- ✅ **User-friendly** - Minimal steps, maximum simplicity
+
+**Perfect for:** Users who want the easiest possible experience for batch processing STL files.
+
+### 🔧 Advanced GUI Version (Nov 4, 2025) - **MOST ADVANCED**
+
+**File:** `hull_baseplate_gui_nov4_2025.py`  
+**Launcher:** `launch_gui_nov4_2025.bat` or `run_gui_nov4_2025.py`
+
+**Features:**
+- ✅ **Full flexibility** - Single file or batch processing
+- ✅ **Customizable output** - Choose output location and organization
+- ✅ **Intermediate files** - Option to keep or discard intermediate files
+- ✅ **Subfolder organization** - Option to create subfolders for each file
+- ✅ **Manual or auto output** - Choose your own output folder or use auto-generation
+- ✅ **Progress tracking** - Detailed progress for each file
+
+**Perfect for:** Power users who need full control over processing options and file organization.
+
+### 📜 Original GUI Version - **OBSOLETE**
+
+**File:** `hull_baseplate_gui.py`  
+**Launcher:** `launch_gui.bat` or `run_gui.py`
+
+**Status:** Kept for compatibility, but **not recommended** for new users. Use Nov 4 or Nov 10 versions instead.
+
+**Features:** Single STL file processing with manual output folder selection (basic functionality)
 
 ## 🚀 Quick Start
 
-### Original GUI Version
+### 🎯 Simplified GUI Version (Nov 10, 2025) - **RECOMMENDED FOR MOST USERS**
 
 #### Option 1: Double-Click Launcher (Recommended)
-1. **Double-click `launch_gui.bat`**
+1. **Double-click `launch_gui_nov10_2025.bat`**
 2. The application will automatically set up everything and launch
 3. Follow the on-screen instructions
 
@@ -35,10 +68,10 @@ A user-friendly desktop application for the STL to Hull Baseplate Pipeline. This
    ```
 3. **Run the GUI:**
    ```cmd
-   python run_gui.py
+   python run_gui_nov10_2025.py
    ```
 
-### Enhanced GUI Version (Nov 4, 2025)
+### 🔧 Advanced GUI Version (Nov 4, 2025) - **MOST ADVANCED**
 
 #### Option 1: Double-Click Launcher (Recommended)
 1. **Double-click `launch_gui_nov4_2025.bat`**
@@ -69,30 +102,43 @@ A user-friendly desktop application for the STL to Hull Baseplate Pipeline. This
 
 ## 🎯 How to Use
 
-### Original GUI Version
+### Simplified GUI Version (Nov 10, 2025) - **RECOMMENDED**
 
-#### Step 1: Setup
+#### Step 1: Setup & Warning
 1. **Open the GUI application**
-2. **Read the Bambu Studio setup instructions**
-3. **Complete the Bambu Studio setup** as described
-4. **Check the "I have completed..." checkbox**
-5. **Click "Next"**
+2. **Read the prominent file deletion warning** at the top
+   - ⚠️ **Important:** The application will delete all .3mf and .gcode.3mf files in your input folder
+   - This prevents errors when Bambu Studio tries to save files that already exist
+   - Only .stl files will be preserved in the input folder
+3. **Read the Bambu Studio setup instructions**
+4. **Complete the Bambu Studio setup** as described
+5. **Check the "I have completed..." checkbox** (includes acknowledging the deletion warning)
+6. **Click "Next"**
 
-#### Step 2: File Selection
-1. **Select your STL file** using the "Browse..." button
-2. **Choose output folder** where the final file will be saved
-3. **Choose whether to keep intermediate files:**
-   - ✅ **Checked**: Keep all files (STL, hull files, analysis files)
-   - ❌ **Unchecked**: Keep only the final combined model
-4. **Click "Run Pipeline"**
+#### Step 2: Select Input Folder
+1. **Click "Browse..."** to select your input folder
+   - The folder should contain all the STL files you want to process
+2. **The application will automatically:**
+   - Count the STL files in the folder
+   - Create output folder at `{input_folder}\slicer_output`
+   - Process all files sequentially
+   - Keep only final output files (no intermediate files)
+3. **Click "Run Pipeline"**
 
-#### Step 3: Progress
-1. **Watch the progress bar** and status updates
-2. **Monitor the log output** for detailed information
-3. **Wait for completion** (usually 2-5 minutes)
-4. **Click "Open Output Folder"** to see your files
+#### Step 3: Processing
+1. **The application will:**
+   - Delete all .3mf and .gcode.3mf files from input folder (before processing)
+   - Process all STL files sequentially
+   - Save final output files to `{input_folder}\slicer_output`
+   - Delete all .3mf and .gcode.3mf files from input folder again (after successful processing)
+2. **Watch the progress bar** and status updates
+3. **Monitor the log output** for detailed information
+4. **Wait for completion** (usually 2-5 minutes per file)
+5. **Click "Open Output Folder"** to see your files
 
-### Enhanced GUI Version (Nov 4, 2025)
+**Note:** If any file fails to process, the cleanup step will be skipped to preserve files for debugging.
+
+### 🔧 Advanced GUI Version (Nov 4, 2025) - **MOST ADVANCED**
 
 #### Step 1: Setup
 1. **Open the GUI application**
@@ -217,13 +263,17 @@ If files with the same name exist (when not using subfolders), the application a
 - **Check that output folder is writable**
 
 ### GUI doesn't start
+- **Simplified Version (Nov 10, 2025) - Try running from Command Prompt:**
+  ```cmd
+  python run_gui_nov10_2025.py
+  ```
+- **Advanced Version (Nov 4, 2025) - Try running from Command Prompt:**
+  ```cmd
+  python run_gui_nov4_2025.py
+  ```
 - **Original Version - Try running from Command Prompt:**
   ```cmd
   python run_gui.py
-  ```
-- **Enhanced Version (Nov 4, 2025) - Try running from Command Prompt:**
-  ```cmd
-  python run_gui_nov4_2025.py
   ```
 - **Check Python installation:**
   ```cmd
@@ -256,15 +306,26 @@ If files with the same name exist (when not using subfolders), the application a
 - **Real-time progress** and status updates
 - **One-click folder access** to results
 
-### Enhanced Features (Nov 4, 2025 Version)
+### Enhanced Features (Nov 4, 2025 Version) - **MOST ADVANCED**
 - **Batch Processing**: Process entire folders of STL files sequentially
 - **Auto Output Folder**: Automatically creates `{input_folder}\slicer_output`
 - **Flexible Organization**: Option to use subfolders or place files directly
 - **Sequential Processing**: Each file completes before the next starts
 - **Progress Tracking**: Shows current file number during batch operations
+- **Full Control**: All options customizable (output location, intermediate files, subfolders)
+
+### Simplified Features (Nov 10, 2025 Version) - **RECOMMENDED**
+- **Automatic Batch Processing**: Processes all STL files in folder automatically
+- **Automatic Output Folder**: Always creates `{input_folder}\slicer_output`
+- **Automatic Cleanup**: Deletes .3mf and .gcode.3mf files to prevent errors
+- **No Configuration**: Everything is automatic - just select input folder
+- **User-Friendly**: Minimal steps, maximum simplicity
+- **Error Prevention**: Automatic file cleanup prevents Bambu Studio save conflicts
 - **Smart File Management**: Automatic conflict resolution with file renaming
 
 ## 🔍 What the Pipeline Does
+
+The pipeline automatically performs these steps for each STL file:
 
 1. **Slices your STL** in Bambu Studio with your settings
 2. **Analyzes the first layer** to find all print areas
@@ -274,6 +335,20 @@ If files with the same name exist (when not using subfolders), the application a
 6. **Slices the baseplate** in Bambu Studio
 7. **Combines the baseplate** with your original model
 8. **Creates the final file** ready for printing
+
+### Version-Specific Behavior
+
+**Nov 10 (Simplified) Version:**
+- Automatically processes all STL files in the input folder
+- Automatically deletes .3mf and .gcode.3mf files before and after processing
+- Only keeps final output files (no intermediate files)
+- Output folder always at `{input_folder}\slicer_output`
+
+**Nov 4 (Advanced) Version:**
+- Can process single files or entire folders
+- User controls output location and file organization
+- Option to keep or discard intermediate files
+- Option to create subfolders for each file
 
 ## 💡 Tips for Best Results
 
