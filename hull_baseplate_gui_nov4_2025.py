@@ -77,6 +77,9 @@ class HullBaseplateApp:
         
         # Start with setup page
         self.notebook.select(0)
+        
+        # Log version on startup (test update feature - v1.0.1)
+        self.root.after(100, lambda: self._log_startup_version())
     
     def create_menu_bar(self):
         """Create menu bar with Help menu including Check for Updates."""
@@ -620,6 +623,12 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
     def go_to_progress(self):
         """Navigate to progress page."""
         self.notebook.select(2)
+    
+    def _log_startup_version(self):
+        """Log version on startup (test update feature)."""
+        current_version = get_current_version()
+        self.log(f"=== Hull Baseplate Pipeline - Version {current_version} ===")
+        self.log("Application ready. Use Help → Check for Updates to check for new versions.")
     
     def log(self, message):
         """Add message to log text area."""
