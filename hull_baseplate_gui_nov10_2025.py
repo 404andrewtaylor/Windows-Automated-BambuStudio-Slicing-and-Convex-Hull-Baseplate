@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Hull Baseplate Pipeline - Desktop GUI Application (Nov 10, 2025 Version)
+Hull Baseplate Pipeline - Desktop GUI Application (Nov 10, 2025 Version - Simplified)
 
 A simplified desktop application for batch processing STL files.
+Simplified UI with just two buttons: Browse Folder and Run.
 Automatically processes all STL files in a folder sequentially.
 
 Features (Nov 10, 2025):
@@ -29,10 +30,9 @@ from auto_update import check_for_updates, perform_update, get_current_version
 class HullBaseplateApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Hull Baseplate Pipeline (Nov 10, 2025 - Simplified)")
-        self.root.geometry("1200x800")
-        self.root.resizable(True, True)
-        self.root.minsize(1000, 700)
+        self.root.title("Hull Baseplate Pipeline")
+        self.root.geometry("400x250")
+        self.root.resizable(False, False)
         
         # Set application icon (if available)
         try:
@@ -52,36 +52,44 @@ class HullBaseplateApp:
         
         # Create main container
         self.main_frame = ttk.Frame(root, padding="20")
-        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Configure grid weights
-        root.columnconfigure(0, weight=1)
-        root.rowconfigure(0, weight=1)
-        self.main_frame.columnconfigure(0, weight=1)
-        self.main_frame.rowconfigure(1, weight=1)
+        # Title
+        title_label = ttk.Label(self.main_frame, text="Hull Baseplate Pipeline", font=("Arial", 14, "bold"))
+        title_label.pack(pady=(0, 20))
         
-        # Create notebook for pages
-        self.notebook = ttk.Notebook(self.main_frame)
-        self.notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 20))
+        # Folder selection
+        folder_frame = ttk.Frame(self.main_frame)
+        folder_frame.pack(fill=tk.X, pady=10)
         
-        # Create pages
-        self.create_setup_page()
-        self.create_file_selection_page()
-        self.create_progress_page()
+        self.folder_var = tk.StringVar(value="No folder selected")
+        folder_label = ttk.Label(folder_frame, textvariable=self.folder_var, width=40)
+        folder_label.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Status bar
+        browse_btn = ttk.Button(folder_frame, text="Browse Folder", command=self.browse_folder)
+        browse_btn.pack(side=tk.LEFT)
+        
+        # Run button
+        self.run_btn = ttk.Button(self.main_frame, text="Run", command=self.run_pipeline, state=tk.DISABLED)
+        self.run_btn.pack(pady=20)
+        
+        # Help link
+        help_frame = ttk.Frame(self.main_frame)
+        help_frame.pack(fill=tk.X, pady=10)
+        
+        help_link = ttk.Label(help_frame, text="Setup Instructions & Warnings", foreground="blue", cursor="hand2")
+        help_link.pack()
+        help_link.bind("<Button-1>", lambda e: self.show_setup_instructions())
+        
+        # Progress window (hidden initially)
+        self.progress_window = None
+        self.log_text = None
         self.status_var = tk.StringVar(value="Ready")
-        self.status_bar = ttk.Label(self.main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
-        self.status_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
         # Add Help menu with Check for Updates
         self.create_menu_bar()
         
-        # Start with setup page
-        self.notebook.select(0)
-        
-        # Log version on startup (test update feature - v1.0.2)
-        # This message will appear in the log when you go to the progress page
+        # Log version on startup (v1.0.3 - Simplified UI)
         self.root.after(100, lambda: self._log_startup_version())
     
     def create_menu_bar(self):
@@ -257,6 +265,79 @@ Automatically processes all STL files in a folder sequentially.
             except:
                 pass
         return {}
+    
+    def browse_folder(self):
+        """Browse for input folder."""
+        folder_path = filedialog.askdirectory(title="Select Input Folder")
+        if folder_path:
+            self.input_folder_path = folder_path
+            # Truncate display if too long
+            display_path = folder_path if len(folder_path) <= 40 else "..." + folder_path[-37:]
+            self.folder_var.set(display_path)
+            self.run_btn.config(state=tk.NORMAL)
+    
+    def show_setup_instructions(self):
+        """Show setup instructions in a dialog."""
+        instructions = """BAMBU STUDIO SETUP:
+
+1. Open Bambu Studio
+2. Create a new project (File → New Project)
+3. Configure your printer and filament settings
+4. Save the empty project
+
+FILE DELETION WARNING:
+
+This application will DELETE all .3mf and .gcode.3mf files in your input folder.
+
+This is necessary to prevent errors when Bambu Studio saves files.
+Only .stl files will be preserved.
+
+⚠️ Make sure you have backups of important files!
+
+Output files will be saved to: {input_folder}\\slicer_output"""
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Setup Instructions & Warnings")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        text_widget = scrolledtext.ScrolledText(dialog, wrap=tk.WORD, padx=10, pady=10)
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        text_widget.insert("1.0", instructions)
+        text_widget.config(state=tk.DISABLED)
+        
+        ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=10)
+    
+    def create_progress_window(self):
+        """Create progress window."""
+        if self.progress_window is None or not self.progress_window.winfo_exists():
+            self.progress_window = tk.Toplevel(self.root)
+            self.progress_window.title("Processing...")
+            self.progress_window.geometry("800x600")
+            self.progress_window.transient(self.root)
+            
+            # Progress bar
+            self.progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(self.progress_window, variable=self.progress_var, maximum=100)
+            progress_bar.pack(fill=tk.X, padx=20, pady=10)
+            
+            # Status label
+            self.status_label = ttk.Label(self.progress_window, text="Ready...")
+            self.status_label.pack(pady=5)
+            
+            # Log text
+            log_frame = ttk.LabelFrame(self.progress_window, text="Log", padding="10")
+            log_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+            
+            self.log_text = scrolledtext.ScrolledText(log_frame, height=20, wrap=tk.WORD)
+            self.log_text.pack(fill=tk.BOTH, expand=True)
     
     def create_scrollable_frame(self, parent):
         """
@@ -576,17 +657,21 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
     
     def _log_startup_version(self):
         """Log version on startup (test update feature)."""
-        current_version = get_current_version()
-        self.log(f"=== Hull Baseplate Pipeline - Version {current_version} ===")
-        self.log("Application ready. Use Help → Check for Updates to check for new versions.")
-        self.log(f"Update test: This is version {current_version} - Update feature working!")
+        # Only log if progress window exists
+        if hasattr(self, 'log_text') and self.log_text and self.log_text.winfo_exists():
+            current_version = get_current_version()
+            self.log(f"=== Hull Baseplate Pipeline - Version {current_version} ===")
+            self.log("Application ready. Use Help → Check for Updates to check for new versions.")
     
     def log(self, message):
         """Add message to log text area."""
-        if hasattr(self, 'log_text') and self.log_text.winfo_exists():
+        if hasattr(self, 'log_text') and self.log_text and hasattr(self.log_text, 'winfo_exists') and self.log_text.winfo_exists():
             self.log_text.insert(tk.END, f"{time.strftime('%H:%M:%S')} - {message}\n")
             self.log_text.see(tk.END)
             self.root.update_idletasks()
+        else:
+            # Fallback: print to console if log_text not available
+            print(f"{time.strftime('%H:%M:%S')} - {message}")
     
     def update_progress(self, value, status=""):
         """Update progress bar and status."""
@@ -647,25 +732,27 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
     
     def run_pipeline(self):
         """Run the hull baseplate pipeline."""
+        # Validate input
+        if not self.input_folder_path or not os.path.exists(self.input_folder_path):
+            messagebox.showerror("Error", "Please select a valid input folder.")
+            return
+        
+        # Create/show progress window
+        self.create_progress_window()
+        self.progress_window.deiconify()  # Show window
+        
+        # Clear log
+        if self.log_text:
+            self.log_text.delete(1.0, tk.END)
+        
         # Determine output folder (auto-generated)
         self.output_folder_path = self._get_auto_output_folder()
         # Create output folder if it doesn't exist
         os.makedirs(self.output_folder_path, exist_ok=True)
         self.log(f"Auto-generated output folder: {self.output_folder_path}")
         
-        # Validate input
-        if not self.input_folder_path or not os.path.exists(self.input_folder_path):
-            messagebox.showerror("Error", "Please select a valid input folder.")
-            return
-        
-        # Go to progress page
-        self.go_to_progress()
-        
-        # Clear log
-        self.log_text.delete(1.0, tk.END)
-        
         # Disable run button
-        self.run_button.config(state=tk.DISABLED)
+        self.run_btn.config(state=tk.DISABLED)
         
         # Run pipeline in separate thread
         pipeline_thread = threading.Thread(target=self._run_pipeline_thread)
@@ -691,9 +778,8 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
             self.root.after(0, lambda: messagebox.showerror("Error", f"An error occurred: {str(e)}"))
         
         finally:
-            # Re-enable buttons in main thread
-            self.root.after(0, lambda: self.run_button.config(state=tk.NORMAL))
-            self.root.after(0, lambda: self.open_folder_button.config(state=tk.NORMAL))
+            # Re-enable run button in main thread
+            self.root.after(0, lambda: self.run_btn.config(state=tk.NORMAL))
     
     def _process_folder(self):
         """Process all STL files in a folder sequentially."""

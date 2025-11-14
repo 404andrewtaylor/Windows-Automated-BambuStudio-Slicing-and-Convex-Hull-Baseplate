@@ -449,9 +449,50 @@ def main():
         hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
     )
     
-    if not success:
-        print("[ERROR] Error: Failed to import, move, and slice hull")
-        sys.exit(1)
+    # Fallback: If hull gcode not found, create rectangle baseplate
+    if not success or not os.path.exists(hull_gcode_3mf):
+        print("[WARNING] Hull .gcode.3mf not found, creating rectangle fallback baseplate...")
+        
+        # Calculate hull width from original gcode
+        try:
+            from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer
+            gcode_text = extract_gcode_from_3mf_file(gcode_3mf)
+            lines = gcode_text.split('\n')
+            points = parse_gcode_first_layer(lines)
+            
+            # Calculate width (max X - min X)
+            if len(points) > 0:
+                min_x = points[:, 0].min()
+                max_x = points[:, 0].max()
+                hull_width = max_x - min_x
+                # Cap width at 180mm maximum
+                hull_width = min(hull_width, 180.0)
+                print(f"[FALLBACK] Calculated hull width: {hull_width:.2f}mm (capped at 180mm)")
+            else:
+                # Default width if can't calculate (capped at 180mm)
+                hull_width = 180.0
+                print(f"[FALLBACK] Using default width: {hull_width}mm")
+        except Exception as e:
+            print(f"[WARNING] Could not calculate hull width: {e}")
+            hull_width = 180.0  # Default width (capped at 180mm)
+            print(f"[FALLBACK] Using default width: {hull_width}mm")
+        
+        # Create rectangle baseplate STL
+        from create_rectangle_baseplate import create_rectangle_stl
+        rectangle_stl = os.path.abspath(os.path.join(output_dir, f"{stl_name}_rectangle_baseplate.stl"))
+        create_rectangle_stl(hull_width, height_mm=180.0, thickness_mm=1.0, output_path=rectangle_stl)
+        
+        # Slice the rectangle
+        print("[FALLBACK] Slicing rectangle baseplate...")
+        success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
+            rectangle_stl, x_moves, y_moves, output_dir, stl_name, script_dir
+        )
+        
+        if not success or not os.path.exists(hull_gcode_3mf):
+            print("[ERROR] Error: Failed to create rectangle fallback baseplate")
+            sys.exit(1)
+        
+        print("[OK] Rectangle fallback baseplate created successfully")
     
     # Step 5: Run ReplaceBaseplate
     print("")
