@@ -214,11 +214,15 @@ Automatically processes all STL files in a folder sequentially.
         if not response:
             return
         
-        # Go to progress page and show update progress
-        self.go_to_progress()
-        self.log_text.delete(1.0, tk.END)
+        # Create/show progress window and show update progress
+        self.create_progress_window()
+        self.progress_window.deiconify()  # Show window
+        
+        if self.log_text:
+            self.log_text.delete(1.0, tk.END)
         self.log("Starting update process...")
-        self.status_var.set("Updating...")
+        if hasattr(self, 'status_label'):
+            self.status_label.config(text="Updating...")
         
         # Run update in separate thread
         update_thread = threading.Thread(target=self._perform_update_thread, args=(update_info,))
@@ -241,13 +245,15 @@ Automatically processes all STL files in a folder sequentially.
                 self.log("Update completed successfully!")
                 self.root.after(0, lambda: messagebox.showinfo("Update Complete", 
                     "Update installed successfully!\n\nPlease restart the application to use the new version."))
-                self.root.after(0, lambda: self.status_var.set("Update complete - Please restart"))
+                if hasattr(self, 'status_label'):
+                    self.root.after(0, lambda: self.status_label.config(text="Update complete - Please restart"))
             else:
                 self.log(f"Update failed: {result.get('error_message', 'Unknown error')}")
                 self.root.after(0, lambda: messagebox.showerror("Update Failed", 
                     f"Update failed: {result.get('error_message', 'Unknown error')}\n\n"
                     f"Your previous version has been restored from backup."))
-                self.root.after(0, lambda: self.status_var.set("Update failed"))
+                if hasattr(self, 'status_label'):
+                    self.root.after(0, lambda: self.status_label.config(text="Update failed"))
                 
         except Exception as e:
             self.log(f"Error during update: {e}")
