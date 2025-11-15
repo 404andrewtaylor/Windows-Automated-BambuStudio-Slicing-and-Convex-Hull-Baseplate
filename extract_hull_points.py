@@ -46,10 +46,10 @@ if __name__ == "__main__":
     
     gcode_3mf_path = sys.argv[1]
     if not os.path.exists(gcode_3mf_path):
-        print(f"❌ Error: File not found: {gcode_3mf_path}")
+        print(f"[ERROR] Error: File not found: {gcode_3mf_path}")
         sys.exit(1)
     
     # Extract and save hull points
     hull_points = extract_and_save_hull_points(gcode_3mf_path)
     
-    print(f"\n🎯 Next step: Run 'python3 extrude_hull_to_stl.py hull_points.txt' to create STL")
+    print(f"\n[INFO] Next step: Run 'python3 extrude_hull_to_stl.py hull_points.txt' to create STL")
