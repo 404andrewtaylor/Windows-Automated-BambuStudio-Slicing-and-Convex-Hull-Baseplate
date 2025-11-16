@@ -932,39 +932,54 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
             output_destination = self.output_folder_path
             self.log(f"Placing final output in: {output_destination}")
             
-            # Keep only final output - copy just the final file
-            self.log(f"Copying final output to {output_destination}...")
-            final_filename = os.path.basename(final_output)
-            dest_path = os.path.join(output_destination, final_filename)
+            # Find all *_with_hull_baseplate.gcode.3mf files
+            import glob
+            all_output_files = glob.glob(os.path.join(pipeline_dir, "*_with_hull_baseplate.gcode.3mf"))
             
-            # Check for filename conflicts
-            if os.path.exists(dest_path):
-                # Add number suffix to avoid overwriting
-                if final_filename.endswith('.gcode.3mf'):
-                    base = final_filename[:-10]  # Remove '.gcode.3mf'
-                    ext = '.gcode.3mf'
-                else:
-                    base, ext = os.path.splitext(final_filename)
-                counter = 1
-                while os.path.exists(dest_path):
-                    new_name = f"{base}_{counter}{ext}"
-                    dest_path = os.path.join(output_destination, new_name)
-                    counter += 1
-                self.log(f"  Warning: File exists, renaming to: {os.path.basename(dest_path)}")
+            if not all_output_files:
+                self.log(f"Warning: No *_with_hull_baseplate.gcode.3mf files found in {pipeline_dir}")
+            else:
+                self.log(f"Found {len(all_output_files)} output file(s) to copy")
+                for final_output in all_output_files:
+                    final_filename = os.path.basename(final_output)
+                    dest_path = os.path.join(output_destination, final_filename)
+                    
+                    # Check for filename conflicts
+                    if os.path.exists(dest_path):
+                        # Add number suffix to avoid overwriting
+                        if final_filename.endswith('.gcode.3mf'):
+                            base = final_filename[:-10]  # Remove '.gcode.3mf'
+                            ext = '.gcode.3mf'
+                        else:
+                            base, ext = os.path.splitext(final_filename)
+                        counter = 1
+                        while os.path.exists(dest_path):
+                            new_name = f"{base}_{counter}{ext}"
+                            dest_path = os.path.join(output_destination, new_name)
+                            counter += 1
+                        self.log(f"  Warning: File exists, renaming to: {os.path.basename(dest_path)}")
+                    
+                    shutil.copy2(final_output, dest_path)
+                    self.log(f"  Final output copied to: {dest_path}")
             
-                shutil.copy2(final_output, dest_path)
-                self.log(f"  Final output copied to: {dest_path}")
-                
-                # Always copy the log file to output directory
-                log_file = os.path.join(pipeline_dir, f"{stl_name}_pipeline_log.txt")
-                if os.path.exists(log_file):
-                    log_dest = os.path.join(self.output_folder_path, os.path.basename(log_file))
-                    shutil.copy2(log_file, log_dest)
-                    self.log(f"  Log file copied to: {log_dest}")
-                
-                # Remove the entire pipeline folder since we only want the final output
+            # Always copy the log file to output directory
+            log_file = os.path.join(pipeline_dir, f"{stl_name}_pipeline_log.txt")
+            if os.path.exists(log_file):
+                log_dest = os.path.join(self.output_folder_path, os.path.basename(log_file))
+                shutil.copy2(log_file, log_dest)
+                self.log(f"  Log file copied to: {log_dest}")
+            else:
+                self.log(f"  Warning: Log file not found: {log_file}")
+            
+            # Remove the entire pipeline folder since we only want the final output
+            try:
                 shutil.rmtree(pipeline_dir)
-                self.log(f"Pipeline folder removed (only final output kept): {pipeline_dir}")
+                if not os.path.exists(pipeline_dir):
+                    self.log(f"Pipeline folder removed successfully: {pipeline_dir}")
+                else:
+                    self.log(f"Warning: Pipeline folder still exists after removal attempt: {pipeline_dir}")
+            except Exception as e:
+                self.log(f"Error removing pipeline folder: {e}")
         
         except Exception as e:
             self.log(f"Error managing output files: {str(e)}")

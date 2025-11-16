@@ -244,12 +244,14 @@ def move_output_files(stl_file_path, output_folder_path):
             print(f"[ERROR] Pipeline output directory not found: {pipeline_dir}")
             return False
         
-        # Find the final output file
-        final_output = os.path.join(pipeline_dir, f"{stl_name}_with_hull_baseplate.gcode.3mf")
-        print(f"[MOVE] Looking for final output: {final_output}")
+        # Find all *_with_hull_baseplate.gcode.3mf files
+        import glob
+        all_output_files = glob.glob(os.path.join(pipeline_dir, "*_with_hull_baseplate.gcode.3mf"))
+        print(f"[MOVE] Looking for output files matching pattern: *_with_hull_baseplate.gcode.3mf")
+        print(f"[MOVE] Found {len(all_output_files)} output file(s)")
         
-        if not os.path.exists(final_output):
-            print(f"[ERROR] Final output file not found: {final_output}")
+        if not all_output_files:
+            print(f"[ERROR] No *_with_hull_baseplate.gcode.3mf files found in {pipeline_dir}")
             # List what files are actually in the pipeline directory
             if os.path.exists(pipeline_dir):
                 print(f"[DEBUG] Files in pipeline directory:")
@@ -262,32 +264,39 @@ def move_output_files(stl_file_path, output_folder_path):
         os.makedirs(output_destination, exist_ok=True)
         print(f"[MOVE] Output destination: {output_destination}")
         
-        # Keep only final output - copy just the final file
-        final_filename = os.path.basename(final_output)
-        dest_path = os.path.join(output_destination, final_filename)
-        
-        # Check for filename conflicts
-        if os.path.exists(dest_path):
-            # Add number suffix to avoid overwriting
-            if final_filename.endswith('.gcode.3mf'):
-                base = final_filename[:-10]  # Remove '.gcode.3mf'
-                ext = '.gcode.3mf'
+        # Copy all output files
+        copied_count = 0
+        for final_output in all_output_files:
+            final_filename = os.path.basename(final_output)
+            dest_path = os.path.join(output_destination, final_filename)
+            
+            # Check for filename conflicts
+            if os.path.exists(dest_path):
+                # Add number suffix to avoid overwriting
+                if final_filename.endswith('.gcode.3mf'):
+                    base = final_filename[:-10]  # Remove '.gcode.3mf'
+                    ext = '.gcode.3mf'
+                else:
+                    base, ext = os.path.splitext(final_filename)
+                counter = 1
+                while os.path.exists(dest_path):
+                    new_name = f"{base}_{counter}{ext}"
+                    dest_path = os.path.join(output_destination, new_name)
+                    counter += 1
+                print(f"  [WARNING] File exists, renaming to: {os.path.basename(dest_path)}")
+            
+            print(f"[MOVE] Copying output from {final_output} to {dest_path}")
+            shutil.copy2(final_output, dest_path)
+            if os.path.exists(dest_path):
+                file_size = os.path.getsize(dest_path)
+                print(f"  [OK] Output copied to: {dest_path} ({file_size} bytes)")
+                copied_count += 1
             else:
-                base, ext = os.path.splitext(final_filename)
-            counter = 1
-            while os.path.exists(dest_path):
-                new_name = f"{base}_{counter}{ext}"
-                dest_path = os.path.join(output_destination, new_name)
-                counter += 1
-            print(f"  [WARNING] File exists, renaming to: {os.path.basename(dest_path)}")
+                print(f"  [ERROR] Copy failed - destination file does not exist!")
+                return False
         
-        print(f"[MOVE] Copying final output from {final_output} to {dest_path}")
-        shutil.copy2(final_output, dest_path)
-        if os.path.exists(dest_path):
-            file_size = os.path.getsize(dest_path)
-            print(f"  [OK] Final output copied to: {dest_path} ({file_size} bytes)")
-        else:
-            print(f"  [ERROR] Copy failed - destination file does not exist!")
+        if copied_count == 0:
+            print(f"  [ERROR] No files were successfully copied!")
             return False
         
         # Always copy the log file to output directory
