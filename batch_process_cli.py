@@ -410,11 +410,18 @@ def process_folder(input_folder):
             successful_files += 1
             print(f"[OK] Successfully processed: {file_name}")
             
-            # Move final output to specified folder
-            move_output_files(stl_file, output_folder)
+            # Move final output to specified folder (always try, even if pipeline had warnings)
+            print(f"[MOVE] Moving output files to: {output_folder}")
+            move_success = move_output_files(stl_file, output_folder)
+            if not move_success:
+                print(f"[WARNING] Failed to move output files for {file_name}")
         else:
             failed_files += 1
             print(f"[ERROR] Failed to process: {file_name} (return code: {return_code})")
+            
+            # Still try to move files even on failure (in case partial output exists)
+            print(f"[MOVE] Attempting to move any output files despite failure...")
+            move_output_files(stl_file, output_folder)
     
     # Final summary
     print("")
