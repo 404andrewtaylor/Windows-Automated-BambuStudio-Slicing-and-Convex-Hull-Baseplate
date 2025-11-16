@@ -226,8 +226,9 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
         print(f"   Naive baseplate hull center: ({naive_hull_center[0]:.2f}, {naive_hull_center[1]:.2f})")
         
         # Step 5: Calculate offset
+        # Note: Y-axis is inverted in Bambu Studio's coordinate system
         offset_x = original_center[0] - naive_hull_center[0]
-        offset_y = original_center[1] - naive_hull_center[1]
+        offset_y = -(original_center[1] - naive_hull_center[1])  # Invert Y to match Bambu Studio's coordinate system
         
         x_moves = int(round(offset_x))
         y_moves = int(round(offset_y))
