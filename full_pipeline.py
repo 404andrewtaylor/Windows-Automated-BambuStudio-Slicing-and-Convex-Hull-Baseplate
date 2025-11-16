@@ -422,11 +422,23 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
         x_moves = int(round(offset_x))
         y_moves = int(round(offset_y))
         
+        # Calculate rounding errors
+        rounding_error_x = offset_x - x_moves
+        rounding_error_y = offset_y - y_moves
+        
         print(f"\n   [RESULT] Calculated offset: X={offset_x:.3f}mm, Y={offset_y:.3f}mm")
         print(f"   [RESULT] Move counts: X={x_moves}, Y={y_moves}")
         print(f"   [DEBUG] Rounding details:")
-        print(f"      offset_x={offset_x:.6f} -> rounded to {x_moves}")
-        print(f"      offset_y={offset_y:.6f} -> rounded to {y_moves}")
+        print(f"      offset_x={offset_x:.6f} -> rounded to {x_moves} (rounding error: {rounding_error_x:.6f}mm)")
+        print(f"      offset_y={offset_y:.6f} -> rounded to {y_moves} (rounding error: {rounding_error_y:.6f}mm)")
+        
+        # Explain why perfect alignment is impossible with averaging
+        print(f"\n   [DEBUG] Alignment analysis:")
+        print(f"      Averaging min/max offsets minimizes total error but prevents perfect alignment at all corners.")
+        print(f"      If min corner needs {offset_x_min:.3f}mm and max corner needs {offset_x_max:.3f}mm,")
+        print(f"      averaging to {offset_x:.3f}mm means neither corner will be perfectly aligned.")
+        print(f"      Expected residual errors: min_x~{abs(offset_x_min - offset_x):.3f}mm, max_x~{abs(offset_x_max - offset_x):.3f}mm")
+        print(f"      Expected residual errors: min_y~{abs(offset_y_min - offset_y_raw):.3f}mm, max_y~{abs(offset_y_max - offset_y_raw):.3f}mm")
         
         # Debug: Show what movements will be applied
         print(f"\n   [MOVEMENT] Movement plan:")
