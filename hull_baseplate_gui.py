@@ -457,6 +457,13 @@ Uncheck this to save disk space - only the final combined model will be kept.
                 shutil.copy2(final_output, dest_path)
                 self.log(f"Final output copied to: {dest_path}")
                 
+                # Always copy the log file to output directory
+                log_file = os.path.join(pipeline_dir, f"{stl_name}_pipeline_log.txt")
+                if os.path.exists(log_file):
+                    log_dest = os.path.join(self.output_folder_path, os.path.basename(log_file))
+                    shutil.copy2(log_file, log_dest)
+                    self.log(f"  Log file copied to: {log_dest}")
+                
                 # Remove the entire pipeline folder since we only want the final output
                 shutil.rmtree(pipeline_dir)
                 self.log("Pipeline folder removed (only final output kept)")
