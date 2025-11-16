@@ -383,10 +383,11 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
         print(f"      offset_y (inverted for Bambu Studio) = -{offset_y_raw:.3f} = {offset_y:.3f}mm")
         
         # Calculate errors at each corner after applying the offset
+        # Note: Use raw offset for error calculation (position alignment), not inverted (movement direction)
         error_min_x = abs(original_bbox['min_x'] - (naive_min_x + offset_x))
-        error_min_y = abs(original_bbox['min_y'] - (naive_min_y + offset_y))
+        error_min_y = abs(original_bbox['min_y'] - (naive_min_y + offset_y_raw))
         error_max_x = abs(original_bbox['max_x'] - (naive_max_x + offset_x))
-        error_max_y = abs(original_bbox['max_y'] - (naive_max_y + offset_y))
+        error_max_y = abs(original_bbox['max_y'] - (naive_max_y + offset_y_raw))
         
         total_error = error_min_x + error_min_y + error_max_x + error_max_y
         max_error = max(error_min_x, error_min_y, error_max_x, error_max_y)
