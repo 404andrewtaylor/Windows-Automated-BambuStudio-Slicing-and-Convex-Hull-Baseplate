@@ -192,8 +192,8 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
         import json
         import numpy as np
         
-        def get_bbox(three_mf_path):
-            """Get bounding box from 3MF file."""
+        def get_bbox_from_3mf(three_mf_path):
+            """Get bounding box from 3MF file metadata (entire model, all layers)."""
             with zipfile.ZipFile(three_mf_path, 'r') as zip_ref:
                 with zip_ref.open('Metadata/plate_1.json') as f:
                     data = json.load(f)
@@ -201,6 +201,7 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
             bbox = data['bbox_objects'][0]['bbox']
             print(f"   [DEBUG] Raw bbox from 3MF: {bbox}")
             print(f"   [DEBUG] Bbox format: [min_x, min_y, max_x, max_y]")
+            print(f"   [NOTE] This is the bounding box of the ENTIRE model (all layers), not just first 15 layers")
             min_x, min_y, max_x, max_y = bbox[0], bbox[1], bbox[2], bbox[3]
             center_x = (min_x + max_x) / 2
             center_y = (min_y + max_y) / 2
@@ -212,17 +213,100 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
                 'height': max_y - min_y
             }
         
-        # Step 1: Get original model bounding box
-        print("\n   [STEP 1] Analyzing original model...")
-        original_bbox = get_bbox(original_3mf)
-        print(f"   [DEBUG] Original model bbox:")
-        print(f"      min_x: {original_bbox['min_x']:.3f}, min_y: {original_bbox['min_y']:.3f}")
-        print(f"      max_x: {original_bbox['max_x']:.3f}, max_y: {original_bbox['max_y']:.3f}")
-        print(f"      center: ({original_bbox['center_x']:.3f}, {original_bbox['center_y']:.3f})")
-        print(f"      width: {original_bbox['width']:.3f}mm, height: {original_bbox['height']:.3f}mm")
+        def get_stl_bbox(stl_path):
+            """Get bounding box from STL file by reading all vertices."""
+            try:
+                from stl import mesh
+                stl_mesh = mesh.Mesh.from_file(stl_path)
+                
+                # Get all vertices (each triangle has 3 vertices)
+                vertices = stl_mesh.vectors.reshape(-1, 3)
+                
+                # Project to XY plane (ignore Z)
+                xy_vertices = vertices[:, :2]
+                
+                min_x, min_y = np.min(xy_vertices, axis=0)
+                max_x, max_y = np.max(xy_vertices, axis=0)
+                center_x = (min_x + max_x) / 2
+                center_y = (min_y + max_y) / 2
+                
+                return {
+                    'min_x': min_x, 'min_y': min_y,
+                    'max_x': max_x, 'max_y': max_y,
+                    'center_x': center_x, 'center_y': center_y,
+                    'width': max_x - min_x,
+                    'height': max_y - min_y,
+                    'num_vertices': len(vertices)
+                }
+            except Exception as e:
+                print(f"   [WARNING] Could not read STL bbox: {e}")
+                return None
         
-        # Get stl_dir from original_3mf path
+        # Step 1: Get original model bounding boxes
+        print("\n   [STEP 1] Analyzing original model...")
+        
+        # Get 3MF bbox (entire model, all layers)
+        original_3mf_bbox = get_bbox_from_3mf(original_3mf)
+        print(f"   [DEBUG] Original model 3MF bbox (ENTIRE model, all layers):")
+        print(f"      min_x: {original_3mf_bbox['min_x']:.3f}, min_y: {original_3mf_bbox['min_y']:.3f}")
+        print(f"      max_x: {original_3mf_bbox['max_x']:.3f}, max_y: {original_3mf_bbox['max_y']:.3f}")
+        print(f"      center: ({original_3mf_bbox['center_x']:.3f}, {original_3mf_bbox['center_y']:.3f})")
+        print(f"      width: {original_3mf_bbox['width']:.3f}mm, height: {original_3mf_bbox['height']:.3f}mm")
+        
+        # Get STL bbox
         stl_dir = os.path.dirname(original_3mf)
+        original_stl_path = os.path.join(stl_dir, f"{stl_name}.stl")
+        if os.path.exists(original_stl_path):
+            original_stl_bbox = get_stl_bbox(original_stl_path)
+            if original_stl_bbox:
+                print(f"   [DEBUG] Original STL bbox:")
+                print(f"      min_x: {original_stl_bbox['min_x']:.3f}, min_y: {original_stl_bbox['min_y']:.3f}")
+                print(f"      max_x: {original_stl_bbox['max_x']:.3f}, max_y: {original_stl_bbox['max_y']:.3f}")
+                print(f"      center: ({original_stl_bbox['center_x']:.3f}, {original_stl_bbox['center_y']:.3f})")
+                print(f"      width: {original_stl_bbox['width']:.3f}mm, height: {original_stl_bbox['height']:.3f}mm")
+                print(f"      vertices: {original_stl_bbox['num_vertices']}")
+        
+        # Get original model G-code and extract first 15 layers bbox
+        print(f"\n   [STEP 1B] Extracting first 15 layers bbox from original model G-code...")
+        original_gcode_3mf = os.path.join(stl_dir, f"{stl_name}.gcode.3mf")
+        if os.path.exists(original_gcode_3mf):
+            from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer, compute_convex_hull
+            original_gcode_content = extract_gcode_from_3mf_file(original_gcode_3mf)
+            original_points = parse_gcode_first_layer(original_gcode_content)
+            print(f"   [DEBUG] Extracted {len(original_points)} points from original model G-code (first 15 layers)")
+            
+            _, original_hull_points = compute_convex_hull(original_points)
+            print(f"   [DEBUG] Computed convex hull with {len(original_hull_points)} vertices")
+            
+            original_hull_min_x, original_hull_min_y = np.min(original_hull_points, axis=0)
+            original_hull_max_x, original_hull_max_y = np.max(original_hull_points, axis=0)
+            original_hull_center_x = (original_hull_min_x + original_hull_max_x) / 2
+            original_hull_center_y = (original_hull_min_y + original_hull_max_y) / 2
+            original_hull_width = original_hull_max_x - original_hull_min_x
+            original_hull_height = original_hull_max_y - original_hull_min_y
+            
+            original_bbox = {
+                'min_x': original_hull_min_x, 'min_y': original_hull_min_y,
+                'max_x': original_hull_max_x, 'max_y': original_hull_max_y,
+                'center_x': original_hull_center_x, 'center_y': original_hull_center_y,
+                'width': original_hull_width, 'height': original_hull_height
+            }
+            
+            print(f"   [DEBUG] Original model first 15 layers convex hull bbox:")
+            print(f"      min_x: {original_bbox['min_x']:.3f}, min_y: {original_bbox['min_y']:.3f}")
+            print(f"      max_x: {original_bbox['max_x']:.3f}, max_y: {original_bbox['max_y']:.3f}")
+            print(f"      center: ({original_bbox['center_x']:.3f}, {original_bbox['center_y']:.3f})")
+            print(f"      width: {original_bbox['width']:.3f}mm, height: {original_bbox['height']:.3f}mm")
+            
+            print(f"\n   [DEBUG] Comparison: 3MF bbox (all layers) vs First 15 layers hull bbox:")
+            print(f"      min_x diff: {original_3mf_bbox['min_x'] - original_bbox['min_x']:.3f}mm")
+            print(f"      min_y diff: {original_3mf_bbox['min_y'] - original_bbox['min_y']:.3f}mm")
+            print(f"      max_x diff: {original_3mf_bbox['max_x'] - original_bbox['max_x']:.3f}mm")
+            print(f"      max_y diff: {original_3mf_bbox['max_y'] - original_bbox['max_y']:.3f}mm")
+        else:
+            print(f"   [WARNING] Original G-code 3MF not found: {original_gcode_3mf}")
+            print(f"   [WARNING] Using 3MF bbox instead (may not be accurate for first 15 layers)")
+            original_bbox = original_3mf_bbox
         
         # Step 2: Slice hull STL without movement (naive baseplate)
         print("\n   [STEP 2] Creating naive baseplate (slicing hull without movement)...")
@@ -231,41 +315,10 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
             print("   [WARNING] Failed to create naive baseplate, using zero offset")
             return 0, 0
         
-        # Step 3: Extract convex hull from original model G-code (for comparison)
-        print("\n   [STEP 3A] Extracting convex hull from original model G-code...")
+        # Step 3: Extract convex hull from naive baseplate G-code
+        print("\n   [STEP 3] Extracting convex hull from naive baseplate G-code...")
         from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer, compute_convex_hull
         
-        # Get original model G-code to compare hulls
-        original_gcode_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.gcode.3mf"))
-        if os.path.exists(original_gcode_3mf):
-            original_gcode_content = extract_gcode_from_3mf_file(original_gcode_3mf)
-            original_points = parse_gcode_first_layer(original_gcode_content)
-            _, original_hull_points = compute_convex_hull(original_points)
-            
-            original_hull_min_x, original_hull_min_y = np.min(original_hull_points, axis=0)
-            original_hull_max_x, original_hull_max_y = np.max(original_hull_points, axis=0)
-            original_hull_width = original_hull_max_x - original_hull_min_x
-            original_hull_height = original_hull_max_y - original_hull_min_y
-            
-            print(f"   [DEBUG] Original model convex hull bbox:")
-            print(f"      min_x: {original_hull_min_x:.3f}, min_y: {original_hull_min_y:.3f}")
-            print(f"      max_x: {original_hull_max_x:.3f}, max_y: {original_hull_max_y:.3f}")
-            print(f"      width: {original_hull_width:.3f}mm, height: {original_hull_height:.3f}mm")
-            print(f"   [DEBUG] Original model 3MF bbox (for comparison):")
-            print(f"      min_x: {original_bbox['min_x']:.3f}, min_y: {original_bbox['min_y']:.3f}")
-            print(f"      max_x: {original_bbox['max_x']:.3f}, max_y: {original_bbox['max_y']:.3f}")
-            print(f"      width: {original_bbox['width']:.3f}mm, height: {original_bbox['height']:.3f}mm")
-            print(f"   [DEBUG] Difference (3MF bbox - convex hull):")
-            print(f"      min_x diff: {original_bbox['min_x'] - original_hull_min_x:.3f}mm")
-            print(f"      min_y diff: {original_bbox['min_y'] - original_hull_min_y:.3f}mm")
-            print(f"      max_x diff: {original_bbox['max_x'] - original_hull_max_x:.3f}mm")
-            print(f"      max_y diff: {original_bbox['max_y'] - original_hull_max_y:.3f}mm")
-        else:
-            print(f"   [WARNING] Original G-code 3MF not found: {original_gcode_3mf}")
-            original_hull_points = None
-        
-        # Step 3: Extract convex hull from naive baseplate G-code
-        print("\n   [STEP 3B] Extracting convex hull from naive baseplate G-code...")
         gcode_content = extract_gcode_from_3mf_file(naive_gcode_3mf)
         naive_points = parse_gcode_first_layer(gcode_content)
         print(f"   [DEBUG] Extracted {len(naive_points)} points from naive baseplate G-code")
@@ -282,48 +335,81 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
         naive_width = naive_max_x - naive_min_x
         naive_height = naive_max_y - naive_min_y
         
-        print(f"   [DEBUG] Naive hull bbox:")
+        print(f"   [DEBUG] Naive hull bbox (first 15 layers, with 1mm buffer):")
         print(f"      min_x: {naive_min_x:.3f}, min_y: {naive_min_y:.3f}")
         print(f"      max_x: {naive_max_x:.3f}, max_y: {naive_max_y:.3f}")
         print(f"      center: ({naive_center_x:.3f}, {naive_center_y:.3f})")
         print(f"      width: {naive_width:.3f}mm, height: {naive_height:.3f}mm")
         
-        # Compare original hull to naive hull (if available)
-        if original_hull_points is not None:
-            print(f"\n   [DEBUG] Comparison: Original hull vs Naive hull (with 1mm buffer):")
-            print(f"      Original hull height: {original_hull_height:.3f}mm")
-            print(f"      Naive hull height: {naive_height:.3f}mm")
-            print(f"      Height difference: {naive_height - original_hull_height:.3f}mm (expected ~2mm for 1mm buffer on each side)")
-            print(f"      Original hull width: {original_hull_width:.3f}mm")
-            print(f"      Naive hull width: {naive_width:.3f}mm")
-            print(f"      Width difference: {naive_width - original_hull_width:.3f}mm (expected ~2mm for 1mm buffer on each side)")
-            print(f"\n   [DEBUG] Buffer analysis:")
-            print(f"      The 1mm buffer is applied by scaling the hull outward from its center.")
-            print(f"      This can cause asymmetric expansion if the hull shape is not symmetric.")
-            print(f"      The naive hull extends from min_y={naive_min_y:.3f} to max_y={naive_max_y:.3f}")
-            print(f"      The original hull extends from min_y={original_hull_min_y:.3f} to max_y={original_hull_max_y:.3f}")
-            print(f"      Bottom expansion: {naive_min_y - original_hull_min_y:.3f}mm")
-            print(f"      Top expansion: {naive_max_y - original_hull_max_y:.3f}mm")
+        # Get hull STL bbox for comparison
+        if os.path.exists(hull_stl):
+            hull_stl_bbox = get_stl_bbox(hull_stl)
+            if hull_stl_bbox:
+                print(f"\n   [DEBUG] Hull STL bbox:")
+                print(f"      min_x: {hull_stl_bbox['min_x']:.3f}, min_y: {hull_stl_bbox['min_y']:.3f}")
+                print(f"      max_x: {hull_stl_bbox['max_x']:.3f}, max_y: {hull_stl_bbox['max_y']:.3f}")
+                print(f"      center: ({hull_stl_bbox['center_x']:.3f}, {hull_stl_bbox['center_y']:.3f})")
+                print(f"      width: {hull_stl_bbox['width']:.3f}mm, height: {hull_stl_bbox['height']:.3f}mm")
+                print(f"      vertices: {hull_stl_bbox['num_vertices']}")
         
-        # Step 5: Calculate offset based on bounding box corners (min_x, min_y)
-        print("\n   [STEP 5] Calculating offset based on bounding box corners...")
-        print("   [DEBUG] Aligning min_x and min_y corners of bounding boxes")
-        print("   [NOTE] Using original model 3MF bbox (not convex hull) for alignment")
+        # Step 5: Calculate offset to minimize total error across all four corners
+        print("\n   [STEP 5] Calculating offset to minimize total error across all corners...")
+        print("   [DEBUG] Comparing original model first 15 layers bbox to naive hull first 15 layers bbox")
+        print("   [NOTE] Finding offset that minimizes error at all four corners (min_x, min_y, max_x, max_y)")
         
-        # Calculate offset to align the min corners
-        offset_x = original_bbox['min_x'] - naive_min_x
-        offset_y = original_bbox['min_y'] - naive_min_y
+        # Calculate offset for each corner
+        offset_x_min = original_bbox['min_x'] - naive_min_x
+        offset_y_min = original_bbox['min_y'] - naive_min_y
+        offset_x_max = original_bbox['max_x'] - naive_max_x
+        offset_y_max = original_bbox['max_y'] - naive_max_y
         
-        print(f"   [DEBUG] Corner-based offset calculation:")
-        print(f"      original min_x: {original_bbox['min_x']:.3f}, naive min_x: {naive_min_x:.3f}")
-        print(f"      original min_y: {original_bbox['min_y']:.3f}, naive min_y: {naive_min_y:.3f}")
-        print(f"      offset_x = {original_bbox['min_x']:.3f} - {naive_min_x:.3f} = {offset_x:.3f}mm")
-        print(f"      offset_y = {original_bbox['min_y']:.3f} - {naive_min_y:.3f} = {offset_y:.3f}mm")
+        print(f"   [DEBUG] Individual corner offsets:")
+        print(f"      min_x offset: {offset_x_min:.3f}mm (original {original_bbox['min_x']:.3f} - naive {naive_min_x:.3f})")
+        print(f"      min_y offset: {offset_y_min:.3f}mm (original {original_bbox['min_y']:.3f} - naive {naive_min_y:.3f})")
+        print(f"      max_x offset: {offset_x_max:.3f}mm (original {original_bbox['max_x']:.3f} - naive {naive_max_x:.3f})")
+        print(f"      max_y offset: {offset_y_max:.3f}mm (original {original_bbox['max_y']:.3f} - naive {naive_max_y:.3f})")
+        
+        # Average the offsets to minimize total error
+        offset_x = (offset_x_min + offset_x_max) / 2
+        offset_y = (offset_y_min + offset_y_max) / 2
+        
+        print(f"\n   [DEBUG] Averaged offset (minimizes total error):")
+        print(f"      offset_x = ({offset_x_min:.3f} + {offset_x_max:.3f}) / 2 = {offset_x:.3f}mm")
+        print(f"      offset_y = ({offset_y_min:.3f} + {offset_y_max:.3f}) / 2 = {offset_y:.3f}mm")
+        
+        # Calculate errors at each corner after applying the offset
+        error_min_x = abs(original_bbox['min_x'] - (naive_min_x + offset_x))
+        error_min_y = abs(original_bbox['min_y'] - (naive_min_y + offset_y))
+        error_max_x = abs(original_bbox['max_x'] - (naive_max_x + offset_x))
+        error_max_y = abs(original_bbox['max_y'] - (naive_max_y + offset_y))
+        
+        total_error = error_min_x + error_min_y + error_max_x + error_max_y
+        max_error = max(error_min_x, error_min_y, error_max_x, error_max_y)
+        
+        print(f"\n   [DEBUG] Errors at each corner after applying offset:")
+        print(f"      min_x error: {error_min_x:.3f}mm")
+        print(f"      min_y error: {error_min_y:.3f}mm")
+        print(f"      max_x error: {error_max_x:.3f}mm")
+        print(f"      max_y error: {error_max_y:.3f}mm")
+        print(f"      Total error: {total_error:.3f}mm")
+        print(f"      Maximum error: {max_error:.3f}mm")
+        
+        # Check if any error exceeds 5mm threshold
+        if max_error > 5.0:
+            error_msg = (
+                f"ERROR: Maximum corner error ({max_error:.3f}mm) exceeds 5mm threshold!\n"
+                f"   Corner errors: min_x={error_min_x:.3f}mm, min_y={error_min_y:.3f}mm, "
+                f"max_x={error_max_x:.3f}mm, max_y={error_max_y:.3f}mm\n"
+                f"   This indicates a significant misalignment between the original model and naive hull.\n"
+                f"   Please check the hull generation and offset calculation."
+            )
+            print(f"   [ERROR] {error_msg}")
+            raise ValueError(error_msg)
         
         # Also calculate center-based offset for comparison
         center_offset_x = original_bbox['center_x'] - naive_center_x
         center_offset_y = original_bbox['center_y'] - naive_center_y
-        print(f"   [DEBUG] Center-based offset (for comparison):")
+        print(f"\n   [DEBUG] Center-based offset (for comparison):")
         print(f"      center_offset_x: {center_offset_x:.3f}mm")
         print(f"      center_offset_y: {center_offset_y:.3f}mm")
         
