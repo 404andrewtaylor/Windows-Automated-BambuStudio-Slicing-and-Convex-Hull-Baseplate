@@ -965,7 +965,7 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
                 self.log(f"Original pipeline folder removed: {pipeline_dir}")
                 
             else:
-                # Keep only final output - copy just the final file
+                # Keep only final output - copy just the final file and the log file
                 self.log(f"Keeping only final output - copying to {output_destination}...")
                 final_filename = os.path.basename(final_output)
                 dest_path = os.path.join(output_destination, final_filename)
@@ -988,6 +988,13 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
                 
                 shutil.copy2(final_output, dest_path)
                 self.log(f"  Final output copied to: {dest_path}")
+                
+                # Always copy the log file to output directory
+                log_file = os.path.join(pipeline_dir, f"{stl_name}_pipeline_log.txt")
+                if os.path.exists(log_file):
+                    log_dest = os.path.join(output_destination, os.path.basename(log_file))
+                    shutil.copy2(log_file, log_dest)
+                    self.log(f"  Log file copied to: {log_dest}")
                 
                 # Remove the entire pipeline folder since we only want the final output
                 shutil.rmtree(pipeline_dir)

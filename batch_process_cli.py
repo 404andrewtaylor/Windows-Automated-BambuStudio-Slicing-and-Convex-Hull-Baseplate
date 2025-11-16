@@ -274,6 +274,13 @@ def move_output_files(stl_file_path, output_folder_path):
         shutil.copy2(final_output, dest_path)
         print(f"  [OK] Final output copied to: {dest_path}")
         
+        # Always copy the log file to output directory
+        log_file = os.path.join(pipeline_dir, f"{stl_name}_pipeline_log.txt")
+        if os.path.exists(log_file):
+            log_dest = os.path.join(output_destination, os.path.basename(log_file))
+            shutil.copy2(log_file, log_dest)
+            print(f"  [OK] Log file copied to: {log_dest}")
+        
         # Remove the entire pipeline folder since we only want the final output
         shutil.rmtree(pipeline_dir)
         print(f"  [OK] Pipeline folder removed (only final output kept)")
