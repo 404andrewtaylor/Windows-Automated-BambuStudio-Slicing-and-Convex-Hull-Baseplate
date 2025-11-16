@@ -278,12 +278,23 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
             _, original_hull_points = compute_convex_hull(original_points)
             print(f"   [DEBUG] Computed convex hull with {len(original_hull_points)} vertices")
             
-            original_hull_min_x, original_hull_min_y = np.min(original_hull_points, axis=0)
-            original_hull_max_x, original_hull_max_y = np.max(original_hull_points, axis=0)
+            # Apply 1mm buffer to original model hull to match the naive baseplate (which has 1mm buffer)
+            from extract_and_analyze import offset_hull
+            print(f"   [DEBUG] Applying 1mm buffer to original model hull for fair comparison...")
+            original_buffered_hull_points = offset_hull(original_hull_points, buffer_mm=1.0)
+            print(f"   [DEBUG] Buffered hull has {len(original_buffered_hull_points)} vertices")
+            
+            # Calculate bbox from buffered hull
+            original_hull_min_x, original_hull_min_y = np.min(original_buffered_hull_points, axis=0)
+            original_hull_max_x, original_hull_max_y = np.max(original_buffered_hull_points, axis=0)
             original_hull_center_x = (original_hull_min_x + original_hull_max_x) / 2
             original_hull_center_y = (original_hull_min_y + original_hull_max_y) / 2
             original_hull_width = original_hull_max_x - original_hull_min_x
             original_hull_height = original_hull_max_y - original_hull_min_y
+            
+            # Also calculate raw (unbuffered) bbox for reference
+            original_raw_min_x, original_raw_min_y = np.min(original_hull_points, axis=0)
+            original_raw_max_x, original_raw_max_y = np.max(original_hull_points, axis=0)
             
             original_bbox = {
                 'min_x': original_hull_min_x, 'min_y': original_hull_min_y,
@@ -292,11 +303,16 @@ def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
                 'width': original_hull_width, 'height': original_hull_height
             }
             
-            print(f"   [DEBUG] Original model first 15 layers convex hull bbox:")
+            print(f"   [DEBUG] Original model first 15 layers convex hull bbox (with 1mm buffer applied):")
             print(f"      min_x: {original_bbox['min_x']:.3f}, min_y: {original_bbox['min_y']:.3f}")
             print(f"      max_x: {original_bbox['max_x']:.3f}, max_y: {original_bbox['max_y']:.3f}")
             print(f"      center: ({original_bbox['center_x']:.3f}, {original_bbox['center_y']:.3f})")
             print(f"      width: {original_bbox['width']:.3f}mm, height: {original_bbox['height']:.3f}mm")
+            print(f"   [DEBUG] Original model raw (unbuffered) bbox for reference:")
+            print(f"      min_x: {original_raw_min_x:.3f}, min_y: {original_raw_min_y:.3f}")
+            print(f"      max_x: {original_raw_max_x:.3f}, max_y: {original_raw_max_y:.3f}")
+            print(f"      Buffer expansion: min_x={original_hull_min_x - original_raw_min_x:.3f}mm, min_y={original_hull_min_y - original_raw_min_y:.3f}mm")
+            print(f"      Buffer expansion: max_x={original_hull_max_x - original_raw_max_x:.3f}mm, max_y={original_hull_max_y - original_raw_max_y:.3f}mm")
             
             print(f"\n   [DEBUG] Comparison: 3MF bbox (all layers) vs First 15 layers hull bbox:")
             print(f"      min_x diff: {original_3mf_bbox['min_x'] - original_bbox['min_x']:.3f}mm")
