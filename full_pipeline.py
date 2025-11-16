@@ -848,16 +848,38 @@ def main():
         print(f"Log file saved to: {log_file_path}")
         print("=" * 80)
     
+    except SystemExit:
+        # Handle sys.exit() calls - still save the log
+        if 'log_file' in locals():
+            log_file.flush()
+            log_file.close()
+        # Re-raise to maintain exit behavior
+        raise
+    except Exception as e:
+        # Handle any other exceptions - still save the log
+        if 'log_file' in locals():
+            print(f"\n[ERROR] Exception occurred: {e}", file=sys.__stdout__)
+            log_file.flush()
+            log_file.close()
+        # Re-raise to maintain error behavior
+        raise
     finally:
         # Restore stdout and stderr
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
-        # Flush and close the log file
-        if 'log_file' in locals():
-            log_file.flush()
-            log_file.close()
-            # Print to restored stdout
-            print(f"\n[LOG] Pipeline log saved to: {log_file_path}")
+        # Flush and close the log file (in case it wasn't closed in except block)
+        if 'log_file' in locals() and not log_file.closed:
+            try:
+                log_file.flush()
+                log_file.close()
+                # Verify file exists and has content
+                if os.path.exists(log_file_path):
+                    file_size = os.path.getsize(log_file_path)
+                    print(f"\n[LOG] Pipeline log saved to: {log_file_path} ({file_size} bytes)")
+                else:
+                    print(f"\n[WARNING] Log file was not created: {log_file_path}")
+            except Exception as e:
+                print(f"\n[ERROR] Failed to save log file: {e}", file=sys.__stdout__)
 
 
 if __name__ == "__main__":
