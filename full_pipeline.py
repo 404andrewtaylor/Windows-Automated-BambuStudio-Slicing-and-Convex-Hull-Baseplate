@@ -161,7 +161,8 @@ def calculate_offset(original_3mf, hull_stl):
         # Since we don't have the hull 3MF yet, we'll use a default offset
         # This will be refined by the move_and_slice_hull.py script
         # hull_center = (175.0, 160.0)  # Default hull position for H2D printer
-        hull_center = (90.0, 90.0)  # Default hull position for A1 mini
+        # Note: Y coordinate adjusted - Bambu Studio imports STL at Y=100 instead of Y=90
+        hull_center = (90.0, 100.0)  # Default hull position for A1 mini (Y=100, not 90)
         print(f"   Default hull center: ({hull_center[0]:.2f}, {hull_center[1]:.2f})")
         
         offset_x = original_center[0] - hull_center[0]

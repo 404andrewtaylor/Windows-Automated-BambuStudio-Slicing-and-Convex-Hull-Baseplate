@@ -384,11 +384,13 @@ class BambuStudioAutomation:
                 if not self._press_arrow_key(direction, abs(x_moves), with_shift=True):
                     return False
             
-            # Move in Y direction
+            # Move in Y direction (inverted - Bambu Studio's Y coordinate system is inverted)
             if y_moves != 0:
-                print(f"Moving {y_moves} steps in Y direction...")
-                direction = 'up' if y_moves > 0 else 'down'
-                if not self._press_arrow_key(direction, abs(y_moves), with_shift=True):
+                # Invert Y direction: positive y_moves should move down (back), negative should move up (front)
+                inverted_y_moves = -y_moves
+                print(f"Moving {y_moves} steps in Y direction (inverted to {inverted_y_moves})...")
+                direction = 'up' if inverted_y_moves > 0 else 'down'
+                if not self._press_arrow_key(direction, abs(inverted_y_moves), with_shift=True):
                     return False
             
             # Wait for moves to complete
