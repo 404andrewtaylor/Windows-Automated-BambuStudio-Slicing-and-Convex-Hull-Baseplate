@@ -484,7 +484,7 @@ def main():
         # Slice the rectangle (don't move it - place at origin 0,0)
         print("[FALLBACK] Slicing rectangle baseplate at origin (no movement)...")
         success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
-            rectangle_stl, x_moves=0, y_moves=0, output_dir, stl_name, script_dir
+            rectangle_stl, 0, 0, output_dir, stl_name, script_dir
         )
         
         if not success or not os.path.exists(hull_gcode_3mf):
