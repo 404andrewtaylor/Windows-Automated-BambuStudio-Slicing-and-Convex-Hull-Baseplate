@@ -133,9 +133,56 @@ def create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl):
         os.chdir(original_cwd)
 
 
-def calculate_offset(original_3mf, hull_stl):
-    """Calculate alignment offset between original and hull."""
-    print("   Calculating alignment offset...")
+def slice_naive_baseplate(hull_stl, output_dir, stl_name, script_dir):
+    """Slice the hull STL without any movement to create naive baseplate."""
+    print("   Creating naive baseplate (slicing hull without movement)...")
+    
+    # Convert all paths to absolute
+    hull_stl = os.path.abspath(hull_stl)
+    output_dir = os.path.abspath(output_dir)
+    script_dir = os.path.abspath(script_dir)
+    
+    # Prepare file paths for naive baseplate
+    naive_gcode_3mf = os.path.abspath(os.path.join(output_dir, f"{stl_name}_naive_baseplate.gcode.3mf"))
+    naive_3mf = os.path.abspath(os.path.join(output_dir, f"{stl_name}_naive_baseplate.3mf"))
+    
+    # Change to script directory to ensure imports work
+    original_cwd = os.getcwd()
+    os.chdir(script_dir)
+    
+    try:
+        # Add script directory to Python path
+        import sys
+        if script_dir not in sys.path:
+            sys.path.insert(0, str(script_dir))
+        
+        # Import the appropriate automation module based on platform
+        import platform
+        if platform.system() == "Windows":
+            from automation_windows import import_move_slice_file
+        elif platform.system() == "Darwin":
+            from automation_mac import import_move_slice_file
+        else:
+            print("[ERROR] Error: Unsupported platform. Only Windows and macOS are supported.")
+            return None
+        
+        # Slice without movement (x_moves=0, y_moves=0)
+        success = import_move_slice_file(hull_stl, 0, 0, naive_gcode_3mf, naive_3mf)
+        
+        if success and os.path.exists(naive_gcode_3mf):
+            print(f"   [OK] Naive baseplate created: {naive_gcode_3mf}")
+            return naive_gcode_3mf
+        else:
+            print(f"   [ERROR] Failed to create naive baseplate")
+            return None
+    
+    finally:
+        os.chdir(original_cwd)
+
+
+def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
+    """Calculate alignment offset by slicing naive baseplate and comparing centers."""
+    print("   Calculating alignment offset using naive baseplate method...")
     
     try:
         import zipfile
@@ -153,20 +200,34 @@ def calculate_offset(original_3mf, hull_stl):
             center_y = (bbox[1] + bbox[3]) / 2
             return (center_x, center_y)
         
-        # Get original center
+        # Step 1: Get original model center
         original_center = get_bbox_center(original_3mf)
         print(f"   Original model center: ({original_center[0]:.2f}, {original_center[1]:.2f})")
         
-        # For hull, we need to estimate where it will be positioned
-        # Since we don't have the hull 3MF yet, we'll use a default offset
-        # This will be refined by the move_and_slice_hull.py script
-        # hull_center = (175.0, 160.0)  # Default hull position for H2D printer
-        # Note: Y coordinate adjusted - Bambu Studio imports STL at Y=100 instead of Y=90
-        hull_center = (90.0, 100.0)  # Default hull position for A1 mini (Y=100, not 90)
-        print(f"   Default hull center: ({hull_center[0]:.2f}, {hull_center[1]:.2f})")
+        # Step 2: Slice hull STL without movement (naive baseplate)
+        naive_gcode_3mf = slice_naive_baseplate(hull_stl, output_dir, stl_name, script_dir)
+        if not naive_gcode_3mf:
+            print("   [WARNING] Failed to create naive baseplate, using zero offset")
+            return 0, 0
         
-        offset_x = original_center[0] - hull_center[0]
-        offset_y = original_center[1] - hull_center[1]
+        # Step 3: Extract convex hull from naive baseplate G-code
+        print("   Extracting convex hull from naive baseplate...")
+        from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer, compute_convex_hull
+        
+        gcode_content = extract_gcode_from_3mf_file(naive_gcode_3mf)
+        naive_points = parse_gcode_first_layer(gcode_content)
+        _, naive_hull_points = compute_convex_hull(naive_points)
+        
+        # Step 4: Calculate center of naive hull (bounding box center)
+        import numpy as np
+        min_x, min_y = np.min(naive_hull_points, axis=0)
+        max_x, max_y = np.max(naive_hull_points, axis=0)
+        naive_hull_center = ((min_x + max_x) / 2, (min_y + max_y) / 2)
+        print(f"   Naive baseplate hull center: ({naive_hull_center[0]:.2f}, {naive_hull_center[1]:.2f})")
+        
+        # Step 5: Calculate offset
+        offset_x = original_center[0] - naive_hull_center[0]
+        offset_y = original_center[1] - naive_hull_center[1]
         
         x_moves = int(round(offset_x))
         y_moves = int(round(offset_y))
@@ -188,7 +249,9 @@ def calculate_offset(original_3mf, hull_stl):
         return x_moves, y_moves
         
     except Exception as e:
-        print(f"   Warning: Could not calculate offset: {e}")
+        print(f"   [WARNING] Could not calculate offset: {e}")
+        import traceback
+        traceback.print_exc()
         print("   Using zero offset as fallback")
         return 0, 0
 
@@ -442,8 +505,8 @@ def main():
         print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
         sys.exit(1)
     
-    # Calculate offset
-    x_moves, y_moves = calculate_offset(original_3mf, hull_stl)
+    # Calculate offset using naive baseplate method
+    x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
     
     # Import, move, slice, and export hull
     success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
