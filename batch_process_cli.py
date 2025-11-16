@@ -238,19 +238,29 @@ def move_output_files(stl_file_path, output_folder_path):
         stl_name = os.path.splitext(os.path.basename(stl_file_path))[0]
         pipeline_dir = os.path.join(stl_dir, f"{stl_name}_pipeline")
         
+        print(f"[MOVE] Looking for pipeline directory: {pipeline_dir}")
+        
         if not os.path.exists(pipeline_dir):
-            print(f"[WARNING] Pipeline output directory not found: {pipeline_dir}")
-            return
+            print(f"[ERROR] Pipeline output directory not found: {pipeline_dir}")
+            return False
         
         # Find the final output file
         final_output = os.path.join(pipeline_dir, f"{stl_name}_with_hull_baseplate.gcode.3mf")
+        print(f"[MOVE] Looking for final output: {final_output}")
         
         if not os.path.exists(final_output):
-            print(f"[WARNING] Final output file not found: {final_output}")
-            return
+            print(f"[ERROR] Final output file not found: {final_output}")
+            # List what files are actually in the pipeline directory
+            if os.path.exists(pipeline_dir):
+                print(f"[DEBUG] Files in pipeline directory:")
+                for f in os.listdir(pipeline_dir):
+                    print(f"  - {f}")
+            return False
         
         # Place files directly in output folder (no subfolders)
         output_destination = output_folder_path
+        os.makedirs(output_destination, exist_ok=True)
+        print(f"[MOVE] Output destination: {output_destination}")
         
         # Keep only final output - copy just the final file
         final_filename = os.path.basename(final_output)
@@ -271,22 +281,48 @@ def move_output_files(stl_file_path, output_folder_path):
                 counter += 1
             print(f"  [WARNING] File exists, renaming to: {os.path.basename(dest_path)}")
         
+        print(f"[MOVE] Copying final output from {final_output} to {dest_path}")
         shutil.copy2(final_output, dest_path)
-        print(f"  [OK] Final output copied to: {dest_path}")
+        if os.path.exists(dest_path):
+            file_size = os.path.getsize(dest_path)
+            print(f"  [OK] Final output copied to: {dest_path} ({file_size} bytes)")
+        else:
+            print(f"  [ERROR] Copy failed - destination file does not exist!")
+            return False
         
         # Always copy the log file to output directory
         log_file = os.path.join(pipeline_dir, f"{stl_name}_pipeline_log.txt")
         if os.path.exists(log_file):
             log_dest = os.path.join(output_destination, os.path.basename(log_file))
+            print(f"[MOVE] Copying log file from {log_file} to {log_dest}")
             shutil.copy2(log_file, log_dest)
-            print(f"  [OK] Log file copied to: {log_dest}")
+            if os.path.exists(log_dest):
+                file_size = os.path.getsize(log_dest)
+                print(f"  [OK] Log file copied to: {log_dest} ({file_size} bytes)")
+            else:
+                print(f"  [WARNING] Log file copy may have failed")
+        else:
+            print(f"  [WARNING] Log file not found: {log_file}")
         
         # Remove the entire pipeline folder since we only want the final output
-        shutil.rmtree(pipeline_dir)
-        print(f"  [OK] Pipeline folder removed (only final output kept)")
+        print(f"[MOVE] Removing pipeline directory: {pipeline_dir}")
+        try:
+            shutil.rmtree(pipeline_dir)
+            if not os.path.exists(pipeline_dir):
+                print(f"  [OK] Pipeline folder removed successfully")
+            else:
+                print(f"  [WARNING] Pipeline folder still exists after removal attempt")
+        except Exception as e:
+            print(f"  [ERROR] Failed to remove pipeline folder: {e}")
+            return False
+        
+        return True
         
     except Exception as e:
         print(f"[ERROR] Error managing output files: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def process_folder(input_folder):
