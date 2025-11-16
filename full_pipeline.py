@@ -457,8 +457,7 @@ def main():
         try:
             from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer
             gcode_text = extract_gcode_from_3mf_file(gcode_3mf)
-            lines = gcode_text.split('\n')
-            points = parse_gcode_first_layer(lines)
+            points = parse_gcode_first_layer(gcode_text)
             
             # Calculate width (max X - min X)
             if len(points) > 0:

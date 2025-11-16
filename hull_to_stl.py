@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Complete pipeline: Extract convex hull from gcode and create extruded STL.
+Complete pipeline: Extract convex hull from first 15 layers of gcode and create extruded STL.
 """
 
 import sys
@@ -39,8 +39,8 @@ def main():
         print("\n[PACKAGE] Step 1: Extracting gcode...")
         gcode_content = extract_gcode_from_3mf_file(gcode_3mf_path)
         
-        # Step 2: Parse first layer
-        print("[SEARCH] Step 2: Analyzing first layer...")
+        # Step 2: Parse first 15 layers
+        print("[SEARCH] Step 2: Analyzing first 15 layers...")
         first_layer_points = parse_gcode_first_layer(gcode_content)
         
         # Step 3: Compute convex hull

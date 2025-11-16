@@ -235,7 +235,7 @@ C:\Users\YourName\Documents\MyModel_pipeline\
 The pipeline automatically performs these steps:
 
 1. **Slices the original STL** in Bambu Studio
-2. **Extracts the convex hull** from the first layer
+2. **Extracts the convex hull** from the first 15 layers (provides more comprehensive baseplate coverage)
 3. **Creates a 1mm extruded hull STL**
 4. **Calculates alignment offset** and moves the hull to match the original position
 5. **Slices the aligned hull** in Bambu Studio
@@ -255,7 +255,7 @@ The pipeline creates a folder named `{model_name}_pipeline` containing:
 
 ### Analysis Files
 - `hull_points.txt` - Hull vertices for reference
-- `first_layer_analysis.png` - Visualization of first layer
+- `first_layer_analysis.png` - Visualization of first 15 layers and convex hull
 - `pipeline_summary.txt` - Complete pipeline report
 
 ## 🔧 Troubleshooting

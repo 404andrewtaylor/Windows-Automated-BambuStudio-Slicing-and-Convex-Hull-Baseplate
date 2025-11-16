@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Extract convex hull points from the analysis results and save to a file.
+Extract convex hull points from the first 15 layers analysis results and save to a file.
 This is a helper script to get hull points from extract_and_analyze.py results.
 """
 
@@ -19,7 +19,7 @@ def extract_and_save_hull_points(gcode_3mf_path, output_file="hull_points.txt"):
     # Extract gcode
     gcode_content = extract_gcode_from_3mf_file(gcode_3mf_path)
     
-    # Parse first layer
+    # Parse first 15 layers
     first_layer_points = parse_gcode_first_layer(gcode_content)
     
     # Compute convex hull

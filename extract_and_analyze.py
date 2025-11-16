@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Gcode Extraction and First Layer Analysis
+Gcode Extraction and First Layers Analysis
 
 This script takes a .gcode.3mf file and:
 1. Extracts gcode using ReplaceBaseplate methods
-2. Analyzes the first layer of the gcode
-3. Computes a convex hull that encompasses the first layer
+2. Analyzes the first 15 layers of the gcode
+3. Computes a convex hull that encompasses the first 15 layers
 """
 
 import os
@@ -184,9 +184,55 @@ def find_first_layer_by_z(lines):
     
     return first_layer_start, first_layer_end
 
+def find_first_15_layers_by_z(lines):
+    """Find first 15 layers by looking for Z movements - fallback method for multiple layers."""
+    z_levels = []
+    current_z = None
+    layer_starts = []
+    
+    for i, line in enumerate(lines):
+        m = parse_move(line)
+        if m and 'Z' in m:
+            z_val = m['Z']
+            if current_z is None:
+                current_z = z_val
+                layer_starts.append(i)
+                z_levels.append(z_val)
+                print(f"[ANALYSIS] Found layer 1 at Z={z_val}, starting at line {i}")
+            elif abs(z_val - current_z) > 0.1:  # Significant Z change indicates new layer
+                current_z = z_val
+                layer_starts.append(i)
+                z_levels.append(z_val)
+                print(f"[ANALYSIS] Found layer {len(layer_starts)} at Z={z_val}, starting at line {i}")
+                
+                # Stop after finding 15 layers
+                if len(layer_starts) >= 15:
+                    break
+    
+    if len(layer_starts) == 0:
+        return 0, len(lines)
+    
+    # Return the range from first layer start to last layer start (or end of file)
+    first_start = layer_starts[0]
+    if len(layer_starts) >= 15:
+        # Find where the 15th layer ends (next Z change or end of file)
+        last_start = layer_starts[14]
+        last_end = len(lines)
+        for i in range(last_start, len(lines)):
+            m = parse_move(lines[i])
+            if m and 'Z' in m:
+                z_val = m['Z']
+                if abs(z_val - z_levels[14]) > 0.1:
+                    last_end = i
+                    break
+        return first_start, last_end
+    else:
+        # If we have fewer than 15 layers, use all available layers
+        return first_start, len(lines)
+
 def parse_gcode_first_layer(gcode_content):
-    """Parse the gcode and extract first layer coordinates using your improved method."""
-    print("[SEARCH] Analyzing first layer...")
+    """Parse the gcode and extract coordinates from the first 15 layers using your improved method."""
+    print("[SEARCH] Analyzing first 15 layers...")
     
     lines = gcode_content.split('\n')
     
@@ -194,30 +240,51 @@ def parse_gcode_first_layer(gcode_content):
     layer_ranges = find_layers_ranges(lines)
     
     if layer_ranges:
-        # Get the first layer
-        first_layer_idx = min(layer_ranges.keys())
-        first_layer_start, first_layer_end = layer_ranges[first_layer_idx]
-        print(f"[ANALYSIS] Found first layer {first_layer_idx} at lines {first_layer_start}-{first_layer_end}")
+        # Get the first 15 layers
+        sorted_layer_indices = sorted(layer_ranges.keys())
+        layers_to_process = sorted_layer_indices[:15]  # First 15 layers
+        
+        if len(layers_to_process) == 0:
+            raise ValueError("No layers found in G-code")
+        
+        # Collect points from all layers
+        pts = []
+        for layer_idx in layers_to_process:
+            layer_start, layer_end = layer_ranges[layer_idx]
+            print(f"[ANALYSIS] Processing layer {layer_idx} at lines {layer_start}-{layer_end}")
+            layer_pts = collect_extrusion_points(lines, layer_start, layer_end)
+            
+            # If no extrusion points, fallback to any XY moves
+            if not layer_pts:
+                print(f"[WARNING]  No extrusion points found in layer {layer_idx}, trying fallback...")
+                for i in range(layer_start, layer_end):
+                    m = parse_move(lines[i])
+                    if m and 'X' in m and 'Y' in m:
+                        layer_pts.append((m['X'], m['Y']))
+            
+            pts.extend(layer_pts)
+        
+        print(f"[ANALYSIS] Processed {len(layers_to_process)} layers (layers {layers_to_process[0]}-{layers_to_process[-1]})")
     else:
-        # Fallback: find first layer by Z movements
+        # Fallback: find first 15 layers by Z movements
         print("[WARNING]  No ;LAYER: comments found, using Z-based layer detection...")
-        first_layer_start, first_layer_end = find_first_layer_by_z(lines)
+        first_15_layers_start, first_15_layers_end = find_first_15_layers_by_z(lines)
+        
+        # Collect points from the first 15 layers range
+        pts = collect_extrusion_points(lines, first_15_layers_start, first_15_layers_end)
+        
+        # If no extrusion points, fallback to any XY moves
+        if not pts:
+            print("[WARNING]  No extrusion points found, trying fallback...")
+            for i in range(first_15_layers_start, first_15_layers_end):
+                m = parse_move(lines[i])
+                if m and 'X' in m and 'Y' in m:
+                    pts.append((m['X'], m['Y']))
     
-    # Collect extrusion points using your method
-    pts = collect_extrusion_points(lines, first_layer_start, first_layer_end)
-    
-    # If no extrusion points, fallback to any XY moves
     if not pts:
-        print("[WARNING]  No extrusion points found, trying fallback...")
-        for i in range(first_layer_start, first_layer_end):
-            m = parse_move(lines[i])
-            if m and 'X' in m and 'Y' in m:
-                pts.append((m['X'], m['Y']))
+        raise ValueError("No XY points found in first 15 layers")
     
-    if not pts:
-        raise ValueError("No XY points found in first layer")
-    
-    print(f"[ANALYSIS] Found {len(pts)} points in first layer")
+    print(f"[ANALYSIS] Found {len(pts)} points across first 15 layers")
     return np.array(pts)
 
 
@@ -245,7 +312,7 @@ def convex_hull(points):
     return hull
 
 def compute_convex_hull(points):
-    """Compute the convex hull of the first layer points using your algorithm."""
+    """Compute the convex hull of the first 15 layers points using your algorithm."""
     print("[HULL] Computing convex hull...")
     
     # Convert numpy array to list of tuples for your algorithm
@@ -323,13 +390,13 @@ def offset_hull(hull_points, buffer_mm=2.0):
 
 
 def visualize_results(points, hull_points, output_dir):
-    """Create a visualization of the first layer and its convex hull."""
+    """Create a visualization of the first 15 layers and their convex hull."""
     print("[ANALYSIS] Creating visualization...")
     
     plt.figure(figsize=(12, 8))
     
-    # Plot all first layer points
-    plt.scatter(points[:, 0], points[:, 1], alpha=0.6, s=1, color='blue', label='First layer points')
+    # Plot all points from first 15 layers
+    plt.scatter(points[:, 0], points[:, 1], alpha=0.6, s=1, color='blue', label='First 15 layers points')
     
     # Plot convex hull
     hull_points_closed = np.vstack([hull_points, hull_points[0]])  # Close the hull
@@ -340,7 +407,7 @@ def visualize_results(points, hull_points, output_dir):
     
     plt.xlabel('X (mm)')
     plt.ylabel('Y (mm)')
-    plt.title('First Layer Analysis - Convex Hull')
+    plt.title('First 15 Layers Analysis - Convex Hull')
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.axis('equal')
@@ -396,7 +463,7 @@ def calculate_hull_metrics(hull_points):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Extract gcode from .gcode.3mf and analyze first layer')
+    parser = argparse.ArgumentParser(description='Extract gcode from .gcode.3mf and analyze first 15 layers')
     parser.add_argument('input_file', help='Path to the .gcode.3mf file or STL file')
     parser.add_argument('--no-viz', action='store_true',
                        help='Skip visualization generation')
@@ -418,7 +485,7 @@ def main():
         # Step 2: Extract gcode using ReplaceBaseplate method
         gcode_content = extract_gcode_from_3mf_file(gcode_3mf_path)
         
-        # Step 3: Parse first layer
+        # Step 3: Parse first 15 layers
         first_layer_points = parse_gcode_first_layer(gcode_content)
         
         # Step 4: Compute convex hull
