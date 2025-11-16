@@ -181,76 +181,130 @@ def slice_naive_baseplate(hull_stl, output_dir, stl_name, script_dir):
 
 
 def calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir):
-    """Calculate alignment offset by slicing naive baseplate and comparing centers."""
+    """Calculate alignment offset by slicing naive baseplate and comparing bounding box corners."""
+    print("   ============================================================")
     print("   Calculating alignment offset using naive baseplate method...")
+    print("   ============================================================")
     
     try:
         import zipfile
         import json
+        import numpy as np
         
-        def get_bbox_center(three_mf_path):
+        def get_bbox(three_mf_path):
+            """Get bounding box from 3MF file."""
             with zipfile.ZipFile(three_mf_path, 'r') as zip_ref:
                 with zip_ref.open('Metadata/plate_1.json') as f:
                     data = json.load(f)
             
             bbox = data['bbox_objects'][0]['bbox']
-            print(f"   Raw bbox: {bbox}")
-            print(f"   Bbox format: [min_x, min_y, max_x, max_y]")
-            center_x = (bbox[0] + bbox[2]) / 2
-            center_y = (bbox[1] + bbox[3]) / 2
-            return (center_x, center_y)
+            print(f"   [DEBUG] Raw bbox from 3MF: {bbox}")
+            print(f"   [DEBUG] Bbox format: [min_x, min_y, max_x, max_y]")
+            min_x, min_y, max_x, max_y = bbox[0], bbox[1], bbox[2], bbox[3]
+            center_x = (min_x + max_x) / 2
+            center_y = (min_y + max_y) / 2
+            return {
+                'min_x': min_x, 'min_y': min_y,
+                'max_x': max_x, 'max_y': max_y,
+                'center_x': center_x, 'center_y': center_y,
+                'width': max_x - min_x,
+                'height': max_y - min_y
+            }
         
-        # Step 1: Get original model center
-        original_center = get_bbox_center(original_3mf)
-        print(f"   Original model center: ({original_center[0]:.2f}, {original_center[1]:.2f})")
+        # Step 1: Get original model bounding box
+        print("\n   [STEP 1] Analyzing original model...")
+        original_bbox = get_bbox(original_3mf)
+        print(f"   [DEBUG] Original model bbox:")
+        print(f"      min_x: {original_bbox['min_x']:.3f}, min_y: {original_bbox['min_y']:.3f}")
+        print(f"      max_x: {original_bbox['max_x']:.3f}, max_y: {original_bbox['max_y']:.3f}")
+        print(f"      center: ({original_bbox['center_x']:.3f}, {original_bbox['center_y']:.3f})")
+        print(f"      width: {original_bbox['width']:.3f}mm, height: {original_bbox['height']:.3f}mm")
         
         # Step 2: Slice hull STL without movement (naive baseplate)
+        print("\n   [STEP 2] Creating naive baseplate (slicing hull without movement)...")
         naive_gcode_3mf = slice_naive_baseplate(hull_stl, output_dir, stl_name, script_dir)
         if not naive_gcode_3mf:
             print("   [WARNING] Failed to create naive baseplate, using zero offset")
             return 0, 0
         
         # Step 3: Extract convex hull from naive baseplate G-code
-        print("   Extracting convex hull from naive baseplate...")
+        print("\n   [STEP 3] Extracting convex hull from naive baseplate G-code...")
         from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer, compute_convex_hull
         
         gcode_content = extract_gcode_from_3mf_file(naive_gcode_3mf)
         naive_points = parse_gcode_first_layer(gcode_content)
+        print(f"   [DEBUG] Extracted {len(naive_points)} points from naive baseplate G-code")
+        
         _, naive_hull_points = compute_convex_hull(naive_points)
+        print(f"   [DEBUG] Computed convex hull with {len(naive_hull_points)} vertices")
         
-        # Step 4: Calculate center of naive hull (bounding box center)
-        import numpy as np
-        min_x, min_y = np.min(naive_hull_points, axis=0)
-        max_x, max_y = np.max(naive_hull_points, axis=0)
-        naive_hull_center = ((min_x + max_x) / 2, (min_y + max_y) / 2)
-        print(f"   Naive baseplate hull center: ({naive_hull_center[0]:.2f}, {naive_hull_center[1]:.2f})")
+        # Step 4: Calculate bounding box of naive hull
+        print("\n   [STEP 4] Calculating naive hull bounding box...")
+        naive_min_x, naive_min_y = np.min(naive_hull_points, axis=0)
+        naive_max_x, naive_max_y = np.max(naive_hull_points, axis=0)
+        naive_center_x = (naive_min_x + naive_max_x) / 2
+        naive_center_y = (naive_min_y + naive_max_y) / 2
+        naive_width = naive_max_x - naive_min_x
+        naive_height = naive_max_y - naive_min_y
         
-        # Step 5: Calculate offset
-        # Note: Y-axis is inverted in Bambu Studio's coordinate system
-        offset_x = original_center[0] - naive_hull_center[0]
-        offset_y = -(original_center[1] - naive_hull_center[1])  # Invert Y to match Bambu Studio's coordinate system
+        print(f"   [DEBUG] Naive hull bbox:")
+        print(f"      min_x: {naive_min_x:.3f}, min_y: {naive_min_y:.3f}")
+        print(f"      max_x: {naive_max_x:.3f}, max_y: {naive_max_y:.3f}")
+        print(f"      center: ({naive_center_x:.3f}, {naive_center_y:.3f})")
+        print(f"      width: {naive_width:.3f}mm, height: {naive_height:.3f}mm")
+        
+        # Step 5: Calculate offset based on bounding box corners (min_x, min_y)
+        print("\n   [STEP 5] Calculating offset based on bounding box corners...")
+        print("   [DEBUG] Aligning min_x and min_y corners of bounding boxes")
+        
+        # Calculate offset to align the min corners
+        offset_x = original_bbox['min_x'] - naive_min_x
+        offset_y = original_bbox['min_y'] - naive_min_y
+        
+        print(f"   [DEBUG] Corner-based offset calculation:")
+        print(f"      original min_x: {original_bbox['min_x']:.3f}, naive min_x: {naive_min_x:.3f}")
+        print(f"      original min_y: {original_bbox['min_y']:.3f}, naive min_y: {naive_min_y:.3f}")
+        print(f"      offset_x = {original_bbox['min_x']:.3f} - {naive_min_x:.3f} = {offset_x:.3f}mm")
+        print(f"      offset_y = {original_bbox['min_y']:.3f} - {naive_min_y:.3f} = {offset_y:.3f}mm")
+        
+        # Also calculate center-based offset for comparison
+        center_offset_x = original_bbox['center_x'] - naive_center_x
+        center_offset_y = original_bbox['center_y'] - naive_center_y
+        print(f"   [DEBUG] Center-based offset (for comparison):")
+        print(f"      center_offset_x: {center_offset_x:.3f}mm")
+        print(f"      center_offset_y: {center_offset_y:.3f}mm")
         
         x_moves = int(round(offset_x))
         y_moves = int(round(offset_y))
         
-        print(f"   Calculated offset: X={offset_x:.2f}mm, Y={offset_y:.2f}mm")
-        print(f"   Move counts: X={x_moves}, Y={y_moves}")
+        print(f"\n   [RESULT] Calculated offset: X={offset_x:.3f}mm, Y={offset_y:.3f}mm")
+        print(f"   [RESULT] Move counts: X={x_moves}, Y={y_moves}")
+        print(f"   [DEBUG] Rounding details:")
+        print(f"      offset_x={offset_x:.6f} -> rounded to {x_moves}")
+        print(f"      offset_y={offset_y:.6f} -> rounded to {y_moves}")
         
         # Debug: Show what movements will be applied
+        print(f"\n   [MOVEMENT] Movement plan:")
         if x_moves > 0:
-            print(f"   Will move hull {x_moves}mm RIGHT")
+            print(f"      X: Move hull {x_moves}mm RIGHT ({abs(x_moves)} steps)")
         elif x_moves < 0:
-            print(f"   Will move hull {abs(x_moves)}mm LEFT")
+            print(f"      X: Move hull {abs(x_moves)}mm LEFT ({abs(x_moves)} steps)")
+        else:
+            print(f"      X: No movement needed")
         
         if y_moves > 0:
-            print(f"   Will move hull {y_moves}mm UP")
+            print(f"      Y: Move hull {y_moves}mm UP ({abs(y_moves)} steps)")
         elif y_moves < 0:
-            print(f"   Will move hull {abs(y_moves)}mm DOWN")
+            print(f"      Y: Move hull {abs(y_moves)}mm DOWN ({abs(y_moves)} steps)")
+        else:
+            print(f"      Y: No movement needed")
+        
+        print("   ============================================================")
         
         return x_moves, y_moves
         
     except Exception as e:
-        print(f"   [WARNING] Could not calculate offset: {e}")
+        print(f"   [ERROR] Could not calculate offset: {e}")
         import traceback
         traceback.print_exc()
         print("   Using zero offset as fallback")
