@@ -689,159 +689,220 @@ def main():
         print(f"[FILE] Output Directory: {output_dir}")
         print(f"[FILE] Log file: {log_file_path}")
         print("")
-    
-    # Check input file
-    if not check_input_file(input_stl):
-        sys.exit(1)
-    
-    print("")
-    
-    # Step 1: Slice the original STL
-    if not slice_original_stl(input_stl, script_dir):
-        print("[ERROR] Error: Failed to slice original STL")
-        sys.exit(1)
-    
-    # Wait a moment for files to be written
-    time.sleep(2)
-    
-    # Step 2: Find the generated .gcode.3mf file
-    print("")
-    print("[SEARCH] Step 2: Locating generated files...")
-    gcode_3mf = find_generated_files(input_stl)
-    if not gcode_3mf:
-        sys.exit(1)
-    
-    # Copy files to output directory
-    output_gcode_3mf = os.path.abspath(os.path.join(output_dir, os.path.basename(gcode_3mf)))
-    import shutil
-    shutil.copy2(gcode_3mf, output_gcode_3mf)
-    print("[FILE] Copied .gcode.3mf to output directory")
-    
-    # Step 3: Extract convex hull and create hull STL
-    hull_stl = create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl)
-    if not hull_stl:
-        print("[ERROR] Error: Failed to create hull STL")
-        sys.exit(1)
-    
-    # Step 4: Calculate offset and move/slice hull
-    print("")
-    print("[PROCESS] Step 4: Calculating offset and moving/slicing hull...")
-    print("   Importing hull STL, moving it, slicing, and exporting...")
-    
-    # Find original 3MF file
-    stl_dir = os.path.dirname(input_stl)
-    original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
-    
-    if not os.path.exists(original_3mf):
-        print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
-        sys.exit(1)
-    
-        # Calculate offset using naive baseplate method
-        x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
-    
-    # Import, move, slice, and export hull
-    success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
-        hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
-    )
-    
-    # Fallback: If hull gcode not found, create rectangle baseplate
-    if not success or not os.path.exists(hull_gcode_3mf):
-        print("[WARNING] Hull .gcode.3mf not found, creating rectangle fallback baseplate...")
         
-        # Calculate hull width from original gcode
-        try:
-            from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer
-            gcode_text = extract_gcode_from_3mf_file(gcode_3mf)
-                points = parse_gcode_first_layer(gcode_text)
-            
-            # Calculate width (max X - min X)
-            if len(points) > 0:
-                min_x = points[:, 0].min()
-                max_x = points[:, 0].max()
-                hull_width = max_x - min_x
-                # Cap width at 180mm maximum
-                hull_width = min(hull_width, 180.0)
-                print(f"[FALLBACK] Calculated hull width: {hull_width:.2f}mm (capped at 180mm)")
-            else:
-                # Default width if can't calculate (capped at 180mm)
-                hull_width = 180.0
-                print(f"[FALLBACK] Using default width: {hull_width}mm")
-        except Exception as e:
-            print(f"[WARNING] Could not calculate hull width: {e}")
-            hull_width = 180.0  # Default width (capped at 180mm)
-            print(f"[FALLBACK] Using default width: {hull_width}mm")
-        
-        # Create rectangle baseplate STL
-        from create_rectangle_baseplate import create_rectangle_stl
-        rectangle_stl = os.path.abspath(os.path.join(output_dir, f"{stl_name}_rectangle_baseplate.stl"))
-        create_rectangle_stl(hull_width, height_mm=180.0, thickness_mm=1.0, output_path=rectangle_stl)
-        
-        # Slice the rectangle (don't move it - place at origin 0,0)
-        print("[FALLBACK] Slicing rectangle baseplate at origin (no movement)...")
-        success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
-                rectangle_stl, 0, 0, output_dir, stl_name, script_dir
-        )
-        
-        if not success or not os.path.exists(hull_gcode_3mf):
-            print("[ERROR] Error: Failed to create rectangle fallback baseplate")
+        # Check input file
+        if not check_input_file(input_stl):
             sys.exit(1)
         
-        print("[OK] Rectangle fallback baseplate created successfully")
-    
-    # Step 5: Run ReplaceBaseplate
-    print("")
-    print("[PROCESS] Step 5: Running ReplaceBaseplate...")
-    print("   Using hull as baseplate and original model as model...")
-    
-    # Prepare file paths for ReplaceBaseplate
-    original_gcode_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.gcode.3mf"))
-    final_output = os.path.abspath(os.path.join(output_dir, f"{stl_name}_with_hull_baseplate.gcode.3mf"))
-    
-    if not run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, script_dir):
-        print("[ERROR] Error: ReplaceBaseplate failed")
-        sys.exit(1)
-    
-    # Step 6: Organize all output files
-    print("")
-    print("[FILE] Step 6: Organizing output files...")
-    
-    # The hull files should already be in the output directory since we sliced the hull STL there
-    # But let's check if they're in the original directory and move them if needed
-    hull_gcode_in_original = os.path.abspath(os.path.join(stl_dir, f"{stl_name}_hull.gcode.3mf"))
-    hull_3mf_in_original = os.path.abspath(os.path.join(stl_dir, f"{stl_name}_hull.3mf"))
-    
-    if os.path.exists(hull_gcode_in_original):
-        shutil.move(hull_gcode_in_original, output_dir)
-        print("[OK] Moved hull .gcode.3mf to output directory")
-    
-    if os.path.exists(hull_3mf_in_original):
-        shutil.move(hull_3mf_in_original, output_dir)
-        print("[OK] Moved hull .3mf to output directory")
-    
-    # Verify the files are now in the output directory
-    if os.path.exists(hull_gcode_3mf):
-        print("[OK] Hull .gcode.3mf confirmed in output directory")
-    else:
-        print("[ERROR] Error: Hull .gcode.3mf still not found after organization")
-        sys.exit(1)
-    
-    # Step 7: Create analysis files
-    if not create_analysis_files(gcode_3mf, output_dir, stl_name, script_dir):
-        print("[WARNING]  Warning: Could not create all analysis files")
-    
-    # Final success message
-    print("")
-    print("[SUCCESS] Full Pipeline Completed Successfully!")
-    print(f"[FILE] All files saved to: {output_dir}")
-    print("")
-    print("[FILES] Generated Files:")
-    for file in os.listdir(output_dir):
-        if file.endswith(('.stl', '.3mf', '.txt', '.png')):
-            file_path = os.path.join(output_dir, file)
-            file_size = os.path.getsize(file_path)
-            print(f"   {file} ({file_size} bytes)")
-    print("")
-    print("[START] Ready for 3D printing both the original and hull models!")
+        print("")
+        
+        # Step 1: Slice the original STL
+        if not slice_original_stl(input_stl, script_dir):
+            print("[ERROR] Error: Failed to slice original STL")
+            sys.exit(1)
+        
+        # Wait a moment for files to be written
+        time.sleep(2)
+        
+        # Step 2: Find the generated .gcode.3mf file
+        print("")
+        print("[SEARCH] Step 2: Locating generated files...")
+        gcode_3mf = find_generated_files(input_stl)
+        if not gcode_3mf:
+            sys.exit(1)
+        
+        # Copy files to output directory
+        output_gcode_3mf = os.path.abspath(os.path.join(output_dir, os.path.basename(gcode_3mf)))
+        import shutil
+        shutil.copy2(gcode_3mf, output_gcode_3mf)
+        print("[FILE] Copied .gcode.3mf to output directory")
+        
+        # Step 3: Extract convex hull and create hull STL
+        hull_stl = create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl)
+        if not hull_stl:
+            print("[ERROR] Error: Failed to create hull STL")
+            sys.exit(1)
+        
+        # Step 4: Calculate offset and move/slice hull
+        print("")
+        print("[PROCESS] Step 4: Calculating offset and moving/slicing hull...")
+        print("   Importing hull STL, moving it, slicing, and exporting...")
+        
+        # Find original 3MF file
+        stl_dir = os.path.dirname(input_stl)
+        original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
+        
+        if not os.path.exists(original_3mf):
+            print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
+            sys.exit(1)
+        
+        # Calculate offset using naive baseplate method
+        x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
+        
+        # Import, move, slice, and export hull
+        success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
+            hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
+        )
+        
+        # Fallback: If hull gcode not found, create rectangle baseplate
+        if not success or not os.path.exists(hull_gcode_3mf):
+            print("[WARNING] Hull .gcode.3mf not found, creating rectangle fallback baseplate...")
+            
+            # Calculate hull width from original gcode
+            try:
+                from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer
+                gcode_text = extract_gcode_from_3mf_file(gcode_3mf)
+                points = parse_gcode_first_layer(gcode_text)
+                
+                # Calculate width (max X - min X)
+                if len(points) > 0:
+                    min_x = points[:, 0].min()
+                    max_x = points[:, 0].max()
+                    hull_width = max_x - min_x
+                    # Cap width at 180mm maximum
+                    hull_width = min(hull_width, 180.0)
+                    print(f"[FALLBACK] Calculated hull width: {hull_width:.2f}mm (capped at 180mm)")
+                else:
+                    # Default width if can't calculate (capped at 180mm)
+                    hull_width = 180.0
+                    print(f"[FALLBACK] Using default width: {hull_width}mm")
+            except Exception as e:
+                print(f"[WARNING] Could not calculate hull width: {e}")
+                hull_width = 180.0  # Default width (capped at 180mm)
+                print(f"[FALLBACK] Using default width: {hull_width}mm")
+            
+            # Create rectangle baseplate STL
+            from create_rectangle_baseplate import create_rectangle_stl
+            rectangle_stl = os.path.abspath(os.path.join(output_dir, f"{stl_name}_rectangle_baseplate.stl"))
+            create_rectangle_stl(hull_width, height_mm=180.0, thickness_mm=1.0, output_path=rectangle_stl)
+            
+            # Slice the rectangle (don't move it - place at origin 0,0)
+            print("[FALLBACK] Slicing rectangle baseplate at origin (no movement)...")
+            success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
+                rectangle_stl, 0, 0, output_dir, stl_name, script_dir
+            )
+            
+            if not success or not os.path.exists(hull_gcode_3mf):
+                print("[ERROR] Error: Failed to create rectangle fallback baseplate")
+                sys.exit(1)
+            
+            print("[OK] Rectangle fallback baseplate created successfully")
+        
+        # Step 5: Run ReplaceBaseplate
+        print("")
+        print("[PROCESS] Step 5: Running ReplaceBaseplate...")
+        print("   Using hull as baseplate and original model as model...")
+        
+        # Prepare file paths for ReplaceBaseplate
+        original_gcode_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.gcode.3mf"))
+        final_output = os.path.abspath(os.path.join(output_dir, f"{stl_name}_with_hull_baseplate.gcode.3mf"))
+        
+        if not run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, script_dir):
+            print("[ERROR] Error: ReplaceBaseplate failed")
+            sys.exit(1)
+        
+        # Step 6: Analyze final baseplate position
+        print("")
+        print("[ANALYSIS] Step 6: Analyzing final baseplate position...")
+        try:
+            import zipfile
+            import json
+            import numpy as np
+            from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer, compute_convex_hull
+            
+            # Get final baseplate bbox from final output
+            if os.path.exists(final_output):
+                # Extract bbox from 3MF
+                with zipfile.ZipFile(final_output, 'r') as zip_ref:
+                    with zip_ref.open('Metadata/plate_1.json') as f:
+                        final_data = json.load(f)
+                
+                final_bbox = final_data['bbox_objects'][0]['bbox']
+                final_min_x, final_min_y, final_max_x, final_max_y = final_bbox[0], final_bbox[1], final_bbox[2], final_bbox[3]
+                
+                # Also extract from G-code first 15 layers
+                final_gcode_content = extract_gcode_from_3mf_file(final_output)
+                final_points = parse_gcode_first_layer(final_gcode_content)
+                _, final_hull_points = compute_convex_hull(final_points)
+                final_hull_min_x, final_hull_min_y = np.min(final_hull_points, axis=0)
+                final_hull_max_x, final_hull_max_y = np.max(final_hull_points, axis=0)
+                
+                print(f"   [DEBUG] Final baseplate 3MF bbox (all layers):")
+                print(f"      min_x: {final_min_x:.3f}, min_y: {final_min_y:.3f}")
+                print(f"      max_x: {final_max_x:.3f}, max_y: {final_max_y:.3f}")
+                print(f"   [DEBUG] Final baseplate first 15 layers hull bbox:")
+                print(f"      min_x: {final_hull_min_x:.3f}, min_y: {final_hull_min_y:.3f}")
+                print(f"      max_x: {final_hull_max_x:.3f}, max_y: {final_hull_max_y:.3f}")
+                
+                # Compare to original model first 15 layers (we need to get this from calculate_offset)
+                # We'll extract it again here for comparison
+                original_gcode_content = extract_gcode_from_3mf_file(original_gcode_3mf)
+                original_points = parse_gcode_first_layer(original_gcode_content)
+                _, original_hull_points = compute_convex_hull(original_points)
+                original_hull_min_x, original_hull_min_y = np.min(original_hull_points, axis=0)
+                original_hull_max_x, original_hull_max_y = np.max(original_hull_points, axis=0)
+                
+                print(f"\n   [DEBUG] Comparison: Final baseplate vs Original model (first 15 layers):")
+                print(f"      min_x diff: {final_hull_min_x - original_hull_min_x:.3f}mm (target: 0.0mm)")
+                print(f"      min_y diff: {final_hull_min_y - original_hull_min_y:.3f}mm (target: 0.0mm)")
+                print(f"      max_x diff: {final_hull_max_x - original_hull_max_x:.3f}mm (target: 0.0mm)")
+                print(f"      max_y diff: {final_hull_max_y - original_hull_max_y:.3f}mm (target: 0.0mm)")
+                
+                max_alignment_error = max(
+                    abs(final_hull_min_x - original_hull_min_x),
+                    abs(final_hull_min_y - original_hull_min_y),
+                    abs(final_hull_max_x - original_hull_max_x),
+                    abs(final_hull_max_y - original_hull_max_y)
+                )
+                print(f"\n   [RESULT] Maximum alignment error: {max_alignment_error:.3f}mm")
+                if max_alignment_error > 5.0:
+                    print(f"   [WARNING] Alignment error exceeds 5mm threshold!")
+        except Exception as e:
+            print(f"   [WARNING] Could not analyze final baseplate position: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Step 7: Organize all output files
+        print("")
+        print("[FILE] Step 7: Organizing output files...")
+        
+        # The hull files should already be in the output directory since we sliced the hull STL there
+        # But let's check if they're in the original directory and move them if needed
+        hull_gcode_in_original = os.path.abspath(os.path.join(stl_dir, f"{stl_name}_hull.gcode.3mf"))
+        hull_3mf_in_original = os.path.abspath(os.path.join(stl_dir, f"{stl_name}_hull.3mf"))
+        
+        if os.path.exists(hull_gcode_in_original):
+            shutil.move(hull_gcode_in_original, output_dir)
+            print("[OK] Moved hull .gcode.3mf to output directory")
+        
+        if os.path.exists(hull_3mf_in_original):
+            shutil.move(hull_3mf_in_original, output_dir)
+            print("[OK] Moved hull .3mf to output directory")
+        
+        # Verify the files are now in the output directory
+        if os.path.exists(hull_gcode_3mf):
+            print("[OK] Hull .gcode.3mf confirmed in output directory")
+        else:
+            print("[ERROR] Error: Hull .gcode.3mf still not found after organization")
+            sys.exit(1)
+        
+        # Step 8: Create analysis files
+        if not create_analysis_files(gcode_3mf, output_dir, stl_name, script_dir):
+            print("[WARNING]  Warning: Could not create all analysis files")
+        
+        # Final success message
+        print("")
+        print("[SUCCESS] Full Pipeline Completed Successfully!")
+        print(f"[FILE] All files saved to: {output_dir}")
+        print("")
+        print("[FILES] Generated Files:")
+        for file in os.listdir(output_dir):
+            if file.endswith(('.stl', '.3mf', '.txt', '.png')):
+                file_path = os.path.join(output_dir, file)
+                file_size = os.path.getsize(file_path)
+                print(f"   {file} ({file_size} bytes)")
+        print("")
+        print("[START] Ready for 3D printing both the original and hull models!")
         print("")
         print("=" * 80)
         print(f"Pipeline completed - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
