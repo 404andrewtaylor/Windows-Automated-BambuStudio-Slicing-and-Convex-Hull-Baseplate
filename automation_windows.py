@@ -211,7 +211,7 @@ class BambuStudioAutomation:
             if not self._press_key_combination('ctrl', 'i'):
                 print("ERROR: Failed to open import dialog")
                 return False
-            time.sleep(4)  # Doubled from 2 to 4
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             # Copy file path to clipboard and paste
             print(f"Copying and pasting file path: {stl_path}")
@@ -244,7 +244,7 @@ class BambuStudioAutomation:
             if not self._press_key_combination('ctrl', 'g'):
                 print("ERROR: Failed to export gcode")
                 return False
-            time.sleep(2)
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             # Type the desired output path
             print(f"Typing output path: {output_gcode_3mf}")
@@ -261,7 +261,7 @@ class BambuStudioAutomation:
             if not self._press_key_combination('ctrl', 's'):
                 print("ERROR: Failed to save project")
                 return False
-            time.sleep(2)
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             # Calculate 3MF output path (convert to absolute path)
             stl_path_abs = os.path.abspath(stl_path)
@@ -300,7 +300,7 @@ class BambuStudioAutomation:
             if not self._press_key_combination('ctrl', 's'):
                 print("ERROR: Failed to save project")
                 return False
-            time.sleep(4)
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             project_path = stl_path.replace('.stl', '.3mf')
             print(f"Saving project to: {project_path}")
@@ -362,7 +362,7 @@ class BambuStudioAutomation:
             print("Importing STL file...")
             if not self._press_key_combination('ctrl', 'i'):
                 return False
-            time.sleep(4)  # Doubled from 2 to 4
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             # Type file path directly
             print(f"Typing file path: {stl_path}")
@@ -384,13 +384,11 @@ class BambuStudioAutomation:
                 if not self._press_arrow_key(direction, abs(x_moves), with_shift=True):
                     return False
             
-            # Move in Y direction (inverted - Bambu Studio's Y coordinate system is inverted)
+            # Move in Y direction
             if y_moves != 0:
-                # Invert Y direction: positive y_moves should move down (back), negative should move up (front)
-                inverted_y_moves = -y_moves
-                print(f"Moving {y_moves} steps in Y direction (inverted to {inverted_y_moves})...")
-                direction = 'up' if inverted_y_moves > 0 else 'down'
-                if not self._press_arrow_key(direction, abs(inverted_y_moves), with_shift=True):
+                print(f"Moving {y_moves} steps in Y direction...")
+                direction = 'up' if y_moves > 0 else 'down'
+                if not self._press_arrow_key(direction, abs(y_moves), with_shift=True):
                     return False
             
             # Wait for moves to complete
@@ -410,7 +408,7 @@ class BambuStudioAutomation:
             print("Exporting gcode...")
             if not self._press_key_combination('ctrl', 'g'):
                 return False
-            time.sleep(4)
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             # Save gcode file
             print(f"Saving gcode to: {output_gcode_3mf}")
@@ -426,7 +424,7 @@ class BambuStudioAutomation:
             print("Saving project...")
             if not self._press_key_combination('ctrl', 's'):
                 return False
-            time.sleep(4)
+            time.sleep(6)  # Increased delay to ensure dialog is fully open and ready for input
             
             print(f"Saving project to: {output_3mf}")
             if not self._type_text(output_3mf):
