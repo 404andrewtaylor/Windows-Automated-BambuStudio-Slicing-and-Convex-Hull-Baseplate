@@ -769,7 +769,6 @@ def main():
             print("   Importing hull STL, moving it, slicing, and exporting...")
             
             # Find original 3MF file
-            stl_dir = os.path.dirname(input_stl)
             original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
             
             if not os.path.exists(original_3mf):
