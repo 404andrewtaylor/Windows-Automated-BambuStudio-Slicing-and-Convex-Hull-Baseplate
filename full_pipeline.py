@@ -718,6 +718,9 @@ def main():
         print(f"[FILE] Log file: {log_file_path}")
         print("")
         
+        # Configuration flag: Set to True to use convex hull baseplate, False to use full-size rectangle
+        USE_CONVEX_HULL = False
+        
         # Check input file
         if not check_input_file(input_stl):
             sys.exit(1)
@@ -745,76 +748,106 @@ def main():
         shutil.copy2(gcode_3mf, output_gcode_3mf)
         print("[FILE] Copied .gcode.3mf to output directory")
         
-        # Step 3: Extract convex hull and create hull STL
-        hull_stl = create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl)
-        if not hull_stl:
-            print("[ERROR] Error: Failed to create hull STL")
-            sys.exit(1)
-        
-        # Step 4: Calculate offset and move/slice hull
-        print("")
-        print("[PROCESS] Step 4: Calculating offset and moving/slicing hull...")
-        print("   Importing hull STL, moving it, slicing, and exporting...")
-        
-        # Find original 3MF file
+        # Get stl_dir for later use (needed for ReplaceBaseplate)
         stl_dir = os.path.dirname(input_stl)
-        original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
         
-        if not os.path.exists(original_3mf):
-            print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
-            sys.exit(1)
-        
-        # Calculate offset using naive baseplate method
-        x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
-        
-        # Import, move, slice, and export hull
-        success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
-            hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
-        )
-        
-        # Fallback: If hull gcode not found, create rectangle baseplate
-        if not success or not os.path.exists(hull_gcode_3mf):
-            print("[WARNING] Hull .gcode.3mf not found, creating rectangle fallback baseplate...")
+        # Step 3 & 4: Create baseplate (either convex hull or full-size rectangle)
+        if USE_CONVEX_HULL:
+            # Original convex hull method
+            print("")
+            print("[HULL] Using convex hull baseplate method...")
             
-            # Calculate hull width from original gcode
-            try:
-                from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer
-                gcode_text = extract_gcode_from_3mf_file(gcode_3mf)
-                points = parse_gcode_first_layer(gcode_text)
+            # Step 3: Extract convex hull and create hull STL
+            hull_stl = create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl)
+            if not hull_stl:
+                print("[ERROR] Error: Failed to create hull STL")
+                sys.exit(1)
+            
+            # Step 4: Calculate offset and move/slice hull
+            print("")
+            print("[PROCESS] Step 4: Calculating offset and moving/slicing hull...")
+            print("   Importing hull STL, moving it, slicing, and exporting...")
+            
+            # Find original 3MF file
+            stl_dir = os.path.dirname(input_stl)
+            original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
+            
+            if not os.path.exists(original_3mf):
+                print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
+                sys.exit(1)
+            
+            # Calculate offset using naive baseplate method
+            x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
+            
+            # Import, move, slice, and export hull
+            success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
+                hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
+            )
+            
+            # Fallback: If hull gcode not found, create rectangle baseplate
+            if not success or not os.path.exists(hull_gcode_3mf):
+                print("[WARNING] Hull .gcode.3mf not found, creating rectangle fallback baseplate...")
                 
-                # Calculate width (max X - min X)
-                if len(points) > 0:
-                    min_x = points[:, 0].min()
-                    max_x = points[:, 0].max()
-                    hull_width = max_x - min_x
-                    # Cap width at 180mm maximum
-                    hull_width = min(hull_width, 180.0)
-                    print(f"[FALLBACK] Calculated hull width: {hull_width:.2f}mm (capped at 180mm)")
-                else:
-                    # Default width if can't calculate (capped at 180mm)
-                    hull_width = 180.0
+                # Calculate hull width from original gcode
+                try:
+                    from extract_and_analyze import extract_gcode_from_3mf_file, parse_gcode_first_layer
+                    gcode_text = extract_gcode_from_3mf_file(gcode_3mf)
+                    points = parse_gcode_first_layer(gcode_text)
+                    
+                    # Calculate width (max X - min X)
+                    if len(points) > 0:
+                        min_x = points[:, 0].min()
+                        max_x = points[:, 0].max()
+                        hull_width = max_x - min_x
+                        # Cap width at 180mm maximum
+                        hull_width = min(hull_width, 180.0)
+                        print(f"[FALLBACK] Calculated hull width: {hull_width:.2f}mm (capped at 180mm)")
+                    else:
+                        # Default width if can't calculate (capped at 180mm)
+                        hull_width = 180.0
+                        print(f"[FALLBACK] Using default width: {hull_width}mm")
+                except Exception as e:
+                    print(f"[WARNING] Could not calculate hull width: {e}")
+                    hull_width = 180.0  # Default width (capped at 180mm)
                     print(f"[FALLBACK] Using default width: {hull_width}mm")
-            except Exception as e:
-                print(f"[WARNING] Could not calculate hull width: {e}")
-                hull_width = 180.0  # Default width (capped at 180mm)
-                print(f"[FALLBACK] Using default width: {hull_width}mm")
+                
+                # Create rectangle baseplate STL
+                from create_rectangle_baseplate import create_rectangle_stl
+                rectangle_stl = os.path.abspath(os.path.join(output_dir, f"{stl_name}_rectangle_baseplate.stl"))
+                create_rectangle_stl(hull_width, height_mm=180.0, thickness_mm=1.0, output_path=rectangle_stl)
+                
+                # Slice the rectangle (don't move it - place at origin 0,0)
+                print("[FALLBACK] Slicing rectangle baseplate at origin (no movement)...")
+                success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
+                    rectangle_stl, 0, 0, output_dir, stl_name, script_dir
+                )
+                
+                if not success or not os.path.exists(hull_gcode_3mf):
+                    print("[ERROR] Error: Failed to create rectangle fallback baseplate")
+                    sys.exit(1)
+                
+                print("[OK] Rectangle fallback baseplate created successfully")
+        else:
+            # Direct full-size rectangle baseplate method (default)
+            print("")
+            print("[RECTANGLE] Using full-size 180x180mm rectangle baseplate method...")
             
-            # Create rectangle baseplate STL
+            # Create full-size rectangle baseplate STL (180x180mm)
             from create_rectangle_baseplate import create_rectangle_stl
             rectangle_stl = os.path.abspath(os.path.join(output_dir, f"{stl_name}_rectangle_baseplate.stl"))
-            create_rectangle_stl(hull_width, height_mm=180.0, thickness_mm=1.0, output_path=rectangle_stl)
+            create_rectangle_stl(180.0, height_mm=180.0, thickness_mm=1.0, output_path=rectangle_stl)
             
             # Slice the rectangle (don't move it - place at origin 0,0)
-            print("[FALLBACK] Slicing rectangle baseplate at origin (no movement)...")
+            print("   Slicing rectangle baseplate at origin (no movement)...")
             success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
                 rectangle_stl, 0, 0, output_dir, stl_name, script_dir
             )
             
             if not success or not os.path.exists(hull_gcode_3mf):
-                print("[ERROR] Error: Failed to create rectangle fallback baseplate")
+                print("[ERROR] Error: Failed to create rectangle baseplate")
                 sys.exit(1)
             
-            print("[OK] Rectangle fallback baseplate created successfully")
+            print("[OK] Full-size rectangle baseplate created successfully")
         
         # Step 5: Run ReplaceBaseplate
         print("")
