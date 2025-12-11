@@ -4,6 +4,31 @@
 
 ---
 
+## ⚠️ CRITICAL NOTE FOR DEVELOPERS AND AI
+
+**IMPORTANT: Operating System Compatibility Requirements**
+
+This project will run on both **Windows** and **Linux**. When editing code:
+
+1. **Windows functionality must NEVER be lost or broken.** All existing Windows functionality must remain completely untouched and fully functional.
+
+2. **OS Detection Required:** Code that differs between Windows and Linux MUST include operating system checks before deciding what to execute.
+
+3. **Implementation Options:**
+   - **Option A:** Create Linux-specific code in a subfolder (e.g., `linux/` directory)
+   - **Option B:** Use conditional statements with OS detection (e.g., `if os.name == 'nt':` for Windows, `elif os.name == 'posix':` for Linux)
+
+4. **Testing:** Before committing changes, verify that:
+   - All Windows functionality still works exactly as before
+   - Linux functionality works correctly
+   - No Windows code paths are accidentally modified or broken
+
+5. **File Paths:** Be especially careful with file paths - Windows uses backslashes (`\`) while Linux uses forward slashes (`/`). Use `os.path.join()` or `pathlib.Path` for cross-platform compatibility.
+
+**For AI Assistants:** When making changes to this codebase, you MUST preserve all Windows functionality. If you're adding Linux support, use OS conditionals or separate files. Never modify Windows-specific code paths without ensuring they still work on Windows.
+
+---
+
 ## 🚀 Quick Start (It's Really This Easy!)
 
 ### ⭐ IMPORTANT: Create Desktop Shortcut First!
@@ -653,7 +678,7 @@ Project repository: https://github.com/404andrewtaylor/Windows-Automated-BambuSt
   - **Update layer replacement:** Change from replacing 5 layers to replacing 6 layers (currently defaults to 5 in `ReplaceBaseplate/replace_baseplate_layers.py` and `full_pipeline.py`)
   - **Note:** Creating the actual library of premade/presliced baseplates can be done later, but is still important
 
-### Future Todos
+### Future Todos (Extra Credit Assignment)
 
 #### Computer Vision & Full Automation
 - [ ] **Implement computer vision for hands-free operation**
