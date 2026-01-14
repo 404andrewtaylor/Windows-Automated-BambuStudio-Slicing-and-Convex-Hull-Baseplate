@@ -31,7 +31,7 @@ class HullBaseplateApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Hull Baseplate Pipeline")
-        self.root.geometry("400x250")
+        self.root.geometry("450x350")
         self.root.resizable(False, False)
         
         # Set application icon (if available)
@@ -50,6 +50,9 @@ class HullBaseplateApp:
         self.auto_output_folder = True  # Always True
         self.create_subfolders = False  # Always False
         
+        # Baseplate mode selection
+        self.baseplate_mode = tk.StringVar(value="dynamic")
+        
         # Create main container
         self.main_frame = ttk.Frame(root, padding="20")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -57,6 +60,17 @@ class HullBaseplateApp:
         # Title
         title_label = ttk.Label(self.main_frame, text="Hull Baseplate Pipeline", font=("Arial", 14, "bold"))
         title_label.pack(pady=(0, 20))
+        
+        # Baseplate mode selection
+        mode_frame = ttk.LabelFrame(self.main_frame, text="Baseplate Mode", padding="10")
+        mode_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Radiobutton(mode_frame, text="Dynamic (Generate Rectangle)", 
+                       variable=self.baseplate_mode, value="dynamic").pack(anchor=tk.W)
+        ttk.Radiobutton(mode_frame, text="Presliced Multicolor (6 layers)", 
+                       variable=self.baseplate_mode, value="presliced_multicolor").pack(anchor=tk.W)
+        ttk.Radiobutton(mode_frame, text="Presliced Single Color (6 layers, cached)", 
+                       variable=self.baseplate_mode, value="presliced_single").pack(anchor=tk.W)
         
         # Folder selection
         folder_frame = ttk.Frame(self.main_frame)
@@ -843,10 +857,11 @@ All .3mf and .gcode.3mf files in the input folder will be deleted before and aft
             
             self.update_progress(progress_start, f"Processing {file_name} ({idx}/{total_files})...")
             
-            # Prepare command
-            cmd = [python_exe, pipeline_script, stl_file]
+            # Prepare command with baseplate mode
+            cmd = [python_exe, pipeline_script, stl_file, "--baseplate-mode", self.baseplate_mode.get()]
             
             self.log(f"Running command: {' '.join(cmd)}")
+            self.log(f"Baseplate mode: {self.baseplate_mode.get()}")
             
             # Run the pipeline
             process = subprocess.Popen(

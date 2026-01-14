@@ -10,6 +10,7 @@ import time
 import json
 import zipfile
 import subprocess
+import argparse
 from pathlib import Path
 from datetime import datetime
 
@@ -533,10 +534,10 @@ def import_move_slice_hull(hull_stl, x_moves, y_moves, output_dir, stl_name, scr
         os.chdir(original_cwd)
 
 
-def run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, script_dir):
+def run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, script_dir, layers_to_replace=5):
     """Run ReplaceBaseplate to combine hull baseplate with original model."""
-    print("[PROCESS] Step 5: Running ReplaceBaseplate...")
-    print("   Using hull as baseplate and original model as model...")
+    print(f"[PROCESS] Step 5: Running ReplaceBaseplate (replacing {layers_to_replace} layers)...")
+    print("   Using baseplate and original model...")
     
     # Convert all paths to absolute
     hull_gcode_3mf = os.path.abspath(hull_gcode_3mf)
@@ -552,7 +553,7 @@ def run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, scri
     
     # Prepare file paths for ReplaceBaseplate
     if not os.path.exists(hull_gcode_3mf):
-        print(f"[ERROR] Error: Hull .gcode.3mf file not found: {hull_gcode_3mf}")
+        print(f"[ERROR] Error: Baseplate .gcode.3mf file not found: {hull_gcode_3mf}")
         return False
     
     if not os.path.exists(original_gcode_3mf):
@@ -563,6 +564,7 @@ def run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, scri
     print("   Baseplate file:", hull_gcode_3mf)
     print("   Model file:", original_gcode_3mf)
     print("   Output file:", final_output)
+    print(f"   Layers to replace: {layers_to_replace}")
     
     # Change to script directory and activate virtual environment
     original_cwd = os.getcwd()
@@ -579,8 +581,8 @@ def run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, scri
             print("[ERROR] Error: Virtual environment not found. Please run setup first.")
             return False
         
-        # Run ReplaceBaseplate
-        cmd = [python_exe, replace_baseplate_script, hull_gcode_3mf, original_gcode_3mf, final_output]
+        # Run ReplaceBaseplate with layer count parameter
+        cmd = [python_exe, replace_baseplate_script, hull_gcode_3mf, original_gcode_3mf, final_output, "--layers", str(layers_to_replace)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
@@ -687,13 +689,18 @@ class TeeOutput:
 
 def main():
     """Main pipeline function."""
-    if len(sys.argv) != 2:
-        print("[ERROR] Error: Please provide an STL file path")
-        print("Usage: python full_pipeline.py <input_stl_file>")
-        print("Example: python full_pipeline.py /path/to/model.stl")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Hull Baseplate Pipeline')
+    parser.add_argument('input_stl', help='Input STL file path')
+    parser.add_argument('--baseplate-mode', 
+                       choices=['dynamic', 'presliced_multicolor', 'presliced_single'],
+                       default='dynamic',
+                       help='Baseplate generation mode (default: dynamic)')
+    parser.add_argument('--layers', type=int, default=None,
+                       help='Number of layers to replace (default: 5 for dynamic, 6 for presliced)')
     
-    input_stl = os.path.abspath(sys.argv[1])  # Convert to absolute path
+    args = parser.parse_args()
+    
+    input_stl = os.path.abspath(args.input_stl)  # Convert to absolute path
     script_dir = get_script_directory()
     
     # Create output directory early so we can save logs there
@@ -718,8 +725,17 @@ def main():
         print(f"[FILE] Log file: {log_file_path}")
         print("")
         
-        # Configuration flag: Set to True to use convex hull baseplate, False to use full-size rectangle
-        USE_CONVEX_HULL = False
+        # Configuration flags
+        USE_CONVEX_HULL = False  # Set to True to use convex hull baseplate, False to use rectangle
+        BASEPLATE_MODE = args.baseplate_mode  # Options: "dynamic", "presliced_multicolor", "presliced_single"
+        
+        # Determine default layers based on mode
+        if args.layers is not None:
+            LAYERS_TO_REPLACE = args.layers
+        elif BASEPLATE_MODE in ["presliced_multicolor", "presliced_single"]:
+            LAYERS_TO_REPLACE = 6  # Presliced baseplates use 6 layers
+        else:
+            LAYERS_TO_REPLACE = 5  # Default for dynamic mode
         
         # Check input file
         if not check_input_file(input_stl):
@@ -751,8 +767,42 @@ def main():
         # Get stl_dir for later use (needed for ReplaceBaseplate)
         stl_dir = os.path.dirname(input_stl)
         
-        # Step 3 & 4: Create baseplate (either convex hull or full-size rectangle)
-        if USE_CONVEX_HULL:
+        # Step 3 & 4: Get or create baseplate based on mode
+        hull_gcode_3mf = None
+        layers_to_replace = LAYERS_TO_REPLACE
+        
+        # Check for presliced baseplates first
+        if BASEPLATE_MODE == "presliced_multicolor":
+            print("")
+            print("[PRESLICED] Using presliced multicolor baseplate (6 layers)...")
+            try:
+                from presliced_baseplate_utils import get_presliced_multicolor_baseplate
+                hull_gcode_3mf = get_presliced_multicolor_baseplate(script_dir)
+                layers_to_replace = 6  # Multicolor baseplate always has 6 layers
+                print(f"[OK] Found presliced multicolor baseplate: {hull_gcode_3mf}")
+            except FileNotFoundError as e:
+                print(f"[ERROR] {e}")
+                sys.exit(1)
+            except Exception as e:
+                print(f"[ERROR] Error loading presliced multicolor baseplate: {e}")
+                sys.exit(1)
+                
+        elif BASEPLATE_MODE == "presliced_single":
+            print("")
+            print("[PRESLICED] Using presliced single-color baseplate (6 layers)...")
+            try:
+                from presliced_baseplate_utils import ensure_presliced_single_color_baseplate
+                hull_gcode_3mf = ensure_presliced_single_color_baseplate(script_dir, layers=6)
+                layers_to_replace = 6  # Single-color baseplate has 6 layers
+                print(f"[OK] Using presliced single-color baseplate: {hull_gcode_3mf}")
+            except Exception as e:
+                print(f"[ERROR] Error with presliced single-color baseplate: {e}")
+                sys.exit(1)
+        
+        # If not using presliced, generate baseplate dynamically
+        if hull_gcode_3mf is None:
+            # Step 3 & 4: Create baseplate (either convex hull or full-size rectangle)
+            if USE_CONVEX_HULL:
             # Original convex hull method
             print("")
             print("[HULL] Using convex hull baseplate method...")
@@ -846,18 +896,18 @@ def main():
                 print("[ERROR] Error: Failed to create rectangle baseplate")
                 sys.exit(1)
             
-            print("[OK] Full-size rectangle baseplate created successfully")
+                print("[OK] Full-size rectangle baseplate created successfully")
         
         # Step 5: Run ReplaceBaseplate
         print("")
-        print("[PROCESS] Step 5: Running ReplaceBaseplate...")
-        print("   Using hull as baseplate and original model as model...")
+        print(f"[PROCESS] Step 5: Running ReplaceBaseplate (replacing {layers_to_replace} layers)...")
+        print("   Using baseplate and original model...")
         
         # Prepare file paths for ReplaceBaseplate
         original_gcode_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.gcode.3mf"))
         final_output = os.path.abspath(os.path.join(output_dir, f"{stl_name}_with_hull_baseplate.gcode.3mf"))
         
-        if not run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, script_dir):
+        if not run_replace_baseplate(hull_gcode_3mf, original_gcode_3mf, final_output, script_dir, layers_to_replace=layers_to_replace):
             print("[ERROR] Error: ReplaceBaseplate failed")
             sys.exit(1)
         

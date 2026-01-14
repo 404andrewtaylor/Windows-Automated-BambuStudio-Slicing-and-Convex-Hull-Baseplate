@@ -47,6 +47,7 @@ class HullBaseplateApp:
         self.auto_output_folder = tk.BooleanVar(value=False)
         self.create_subfolders = tk.BooleanVar(value=True)  # Create subfolder for each file
         self.input_mode = tk.StringVar(value="single")  # "single" or "folder"
+        self.baseplate_mode = tk.StringVar(value="dynamic")  # "dynamic", "presliced_multicolor", "presliced_single"
         
         # Create main container
         self.main_frame = ttk.Frame(root, padding="20")
@@ -409,6 +410,17 @@ This option is particularly useful for batch processing.
         options_frame = ttk.LabelFrame(content_frame, text="Options", padding="10")
         options_frame.pack(fill=tk.X, pady=(0, 20))
         
+        # Baseplate mode selection
+        baseplate_mode_frame = ttk.LabelFrame(options_frame, text="Baseplate Mode", padding="5")
+        baseplate_mode_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Radiobutton(baseplate_mode_frame, text="Dynamic (Generate Rectangle)", 
+                       variable=self.baseplate_mode, value="dynamic").pack(anchor=tk.W)
+        ttk.Radiobutton(baseplate_mode_frame, text="Presliced Multicolor (6 layers)", 
+                       variable=self.baseplate_mode, value="presliced_multicolor").pack(anchor=tk.W)
+        ttk.Radiobutton(baseplate_mode_frame, text="Presliced Single Color (6 layers, cached)", 
+                       variable=self.baseplate_mode, value="presliced_single").pack(anchor=tk.W)
+        
         # Keep intermediate files checkbox
         keep_files_checkbox = ttk.Checkbutton(options_frame, 
                                             text="Keep intermediate files (STL, hull files, etc.)",
@@ -741,7 +753,8 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
                 "Some critical dependencies could not be installed.\nThe pipeline may fail. Check the log for details."))
         
         # Prepare command
-        cmd = [python_exe, pipeline_script, self.stl_file_path]
+        cmd = [python_exe, pipeline_script, self.stl_file_path, "--baseplate-mode", self.baseplate_mode.get()]
+        self.log(f"Baseplate mode: {self.baseplate_mode.get()}")
         
         self.log(f"Running command: {' '.join(cmd)}")
         self.update_progress(10, "Starting pipeline...")
@@ -850,7 +863,8 @@ Uncheck "Create subfolder for each file" to place all final .gcode.3mf files dir
             self.update_progress(progress_start, f"Processing {file_name} ({idx}/{total_files})...")
             
             # Prepare command
-            cmd = [python_exe, pipeline_script, stl_file]
+            cmd = [python_exe, pipeline_script, stl_file, "--baseplate-mode", self.baseplate_mode.get()]
+            self.log(f"Baseplate mode: {self.baseplate_mode.get()}")
             
             self.log(f"Running command: {' '.join(cmd)}")
             
