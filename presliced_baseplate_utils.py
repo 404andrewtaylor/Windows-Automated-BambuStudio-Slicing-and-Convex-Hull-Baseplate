@@ -126,34 +126,51 @@ def create_and_cache_single_color_baseplate(script_dir, width=175, height=175,
             print(f"[WARNING] Could not clean up temp directory {temp_dir}: {e}")
 
 
-def ensure_presliced_single_color_baseplate(script_dir, width=175, height=175, 
-                                           printer_model="A1mini", layers=6):
+def get_presliced_single_color_baseplate(script_dir):
     """
-    Ensure presliced single-color baseplate exists, create if needed.
+    Get path to presliced single-color baseplate (.gcode.3mf format).
     
     Args:
         script_dir: Directory where the script is located
-        width: Width of baseplate in mm (default 175)
-        height: Height of baseplate in mm (default 175)
-        printer_model: Printer model name (default "A1mini")
-        layers: Number of layers (default 6, for consistency with multicolor)
         
     Returns:
-        Path to cached .gcode.3mf file
+        Path to presliced single-color baseplate .gcode.3mf file
+        
+    Raises:
+        FileNotFoundError: If baseplate file is not found
     """
-    _, single_dir, _ = setup_presliced_baseplate_directories(script_dir)
+    # Check root directory for default_colour_baseplate.gcode.3mf
+    gcode_3mf_path = os.path.join(script_dir, "default_colour_baseplate.gcode.3mf")
     
-    cached_name = f"baseplate_{width}x{height}_{printer_model}_{layers}layers.gcode.3mf"
-    cached_path = os.path.join(single_dir, cached_name)
+    if os.path.exists(gcode_3mf_path):
+        print(f"[PRESLICED] Found single-color baseplate: {gcode_3mf_path}")
+        return gcode_3mf_path
     
-    if os.path.exists(cached_path):
-        print(f"[CACHE] Using cached single-color baseplate: {cached_path}")
-        return cached_path
+    # File not found
+    error_msg = (
+        "Presliced single-color baseplate not found.\n"
+        f"Expected location: {gcode_3mf_path}"
+    )
+    raise FileNotFoundError(error_msg)
+
+
+def ensure_presliced_single_color_baseplate(script_dir, width=175, height=175, 
+                                           printer_model="A1mini", layers=6):
+    """
+    Ensure presliced single-color baseplate exists.
+    Now uses default_colour_baseplate.gcode.3mf instead of creating/caching.
     
-    # Create and cache
-    print(f"[CACHE] Cached baseplate not found. Creating new one...")
-    return create_and_cache_single_color_baseplate(script_dir, width, height, 
-                                                  printer_model, layers)
+    Args:
+        script_dir: Directory where the script is located
+        width: Width of baseplate in mm (ignored, kept for compatibility)
+        height: Height of baseplate in mm (ignored, kept for compatibility)
+        printer_model: Printer model name (ignored, kept for compatibility)
+        layers: Number of layers (default 6, ignored but kept for compatibility)
+        
+    Returns:
+        Path to presliced single-color baseplate .gcode.3mf file
+    """
+    return get_presliced_single_color_baseplate(script_dir)
 
 
 def get_baseplate_file_and_layers(mode, script_dir, **kwargs):
@@ -178,13 +195,8 @@ def get_baseplate_file_and_layers(mode, script_dir, **kwargs):
         return baseplate_path, layers
         
     elif mode == "presliced_single":
-        width = kwargs.get('width', 175)
-        height = kwargs.get('height', 175)
-        printer_model = kwargs.get('printer_model', 'A1mini')
         layers = kwargs.get('layers', 6)
-        baseplate_path = ensure_presliced_single_color_baseplate(
-            script_dir, width, height, printer_model, layers
-        )
+        baseplate_path = get_presliced_single_color_baseplate(script_dir)
         return baseplate_path, layers
         
     elif mode == "dynamic":
