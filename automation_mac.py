@@ -149,6 +149,73 @@ class BambuStudioAutomation:
         
         return self._run_applescript(script)
     
+    def slice_3mf(self, three_mf_path, output_gcode_3mf=None, slice_delay=15, file_load_delay=8):
+        """
+        Open a 3MF project file, slice it, and export as G-code 3MF.
+        
+        Args:
+            three_mf_path (str): Path to the .3mf file
+            output_gcode_3mf (str, optional): Path for output .gcode.3mf file.
+                If None, uses same directory as input with .gcode.3mf extension.
+            slice_delay (int): Delay in seconds after starting slice (default: 15)
+            file_load_delay (int): Delay in seconds after opening file (default: 8)
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        three_mf_path = os.path.abspath(three_mf_path)
+        if output_gcode_3mf is None:
+            base = os.path.splitext(os.path.basename(three_mf_path))[0]
+            if base.endswith('.gcode'):
+                base = base[:-6]
+            output_gcode_3mf = os.path.join(os.path.dirname(three_mf_path), f"{base}.gcode.3mf")
+        else:
+            output_gcode_3mf = os.path.abspath(output_gcode_3mf)
+        
+        print(f"🔧 Slicing 3MF file: {three_mf_path}")
+        print(f"   Output: {output_gcode_3mf}")
+        
+        # Open the 3MF file in Bambu Studio via `open -a` (avoids Open dialog)
+        try:
+            subprocess.run(["open", "-a", "BambuStudio", three_mf_path], check=True)
+            time.sleep(file_load_delay)  # Wait for file to load
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to open 3MF in Bambu Studio: {e}")
+            return False
+        
+        # Escape for AppleScript: backslashes and quotes
+        path_out_esc = output_gcode_3mf.replace("\\", "\\\\").replace('"', '\\"')
+        
+        script = f'''
+        tell application "BambuStudio" to activate
+        delay 1
+        tell application "System Events"
+            tell process "BambuStudio"
+                -- Slice (Cmd+R)
+                keystroke "r" using command down
+                delay {slice_delay}
+                -- Export gcode (Cmd+G)
+                keystroke "g" using command down
+                delay 4
+                -- Type full path character by character (more reliable)
+                set savePath to "{path_out_esc}"
+                repeat with i from 1 to count of characters of savePath
+                    keystroke character i of savePath
+                    delay 0.05
+                end repeat
+                delay 1
+                keystroke return
+                delay 0.5
+                keystroke return
+                delay 5
+                keystroke "q" using command down
+                delay 1
+            end tell
+        end tell
+        '''
+        
+        return self._run_applescript(script)
+    
     def import_move_slice(self, stl_path, x_moves, y_moves, output_gcode_3mf, output_3mf):
         """
         Import an STL file, move it, slice it, and export the results.
@@ -286,6 +353,21 @@ class BambuStudioAutomation:
 
 
 # Convenience functions
+def slice_3mf_file(three_mf_path, output_gcode_3mf=None):
+    """
+    Slice a 3MF file using Bambu Studio on Mac.
+    
+    Args:
+        three_mf_path (str): Path to the .3mf file
+        output_gcode_3mf (str, optional): Path for output .gcode.3mf file
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    automation = BambuStudioAutomation()
+    return automation.slice_3mf(three_mf_path, output_gcode_3mf)
+
+
 def slice_stl_file(stl_path, output_dir=None):
     """
     Slice an STL file using Bambu Studio on Mac.
