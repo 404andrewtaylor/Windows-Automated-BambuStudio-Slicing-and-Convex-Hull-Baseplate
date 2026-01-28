@@ -2,6 +2,8 @@
 """
 Automated Pipeline: Slice 4 Most Recent .3mf Files, Create Baseplates, and Fuse Them
 
+⚠️  MAC OS ONLY - This script requires Mac OS and uses AppleScript for automation.
+
 This script:
 1. Finds the 4 most recent .3mf files in Downloads
 2. Slices each one using Bambu Studio automation
@@ -10,17 +12,35 @@ This script:
 5. Fuses the baseplates onto their respective sliced files
 
 Requirements:
-- Mac OS (uses AppleScript automation)
+- ⚠️  Mac OS ONLY (uses AppleScript automation - automation_mac.py)
 - Bambu Studio installed
 - Python dependencies: numpy, trimesh, pathlib
+
+Note: The core baseplate generation (gcode_to_convex_hull_3mf.py) is OS-agnostic,
+but this pipeline script requires Mac OS for Bambu Studio automation.
 """
 
 import os
 import sys
 import subprocess
 import time
+import argparse
+import platform
 from pathlib import Path
 from datetime import datetime
+
+# Check OS - this script is Mac-only
+if platform.system() != "Darwin":
+    print("="*60)
+    print("❌ ERROR: This script requires Mac OS")
+    print("="*60)
+    print(f"Detected OS: {platform.system()}")
+    print("\nThis script uses AppleScript automation which is only available on Mac OS.")
+    print("\nNote: The core baseplate generation (gcode_to_convex_hull_3mf.py) is")
+    print("OS-agnostic and can be used on Windows/Linux, but this pipeline script")
+    print("requires Mac OS for Bambu Studio automation.")
+    print("\nWindows support: Not yet implemented (automation_windows.py lacks slice_3mf method)")
+    sys.exit(1)
 
 # Add script directory to path for imports
 script_dir = Path(__file__).parent.absolute()
@@ -229,7 +249,7 @@ def slice_baseplate(automation, baseplate_3mf_path, output_baseplate_gcode_3mf=N
             print(f"🔄 Retry attempt {attempt + 1}/{max_retries} with delays: load={file_load_delay}s, slice={slice_delay}s")
         
         success = automation.slice_3mf(str(baseplate_3mf_path), str(output_baseplate_gcode_3mf),
-                                      file_load_delay=file_load_delay, slice_delay=slice_delay)
+                                      file_load_delay=file_load_delay, slice_delay=slice_delay, quit_after=False)
         
         # Wait a bit for file to be written
         time.sleep(2)
@@ -352,16 +372,45 @@ def fuse_baseplate(baseplate_gcode_3mf, model_gcode_3mf, output_fused_3mf, layer
 
 def main():
     """Main pipeline execution."""
+    parser = argparse.ArgumentParser(
+        description='Automated baseplate pipeline: slice 4 most recent .3mf files, create baseplates, and fuse them\n⚠️  MAC OS ONLY - Requires Mac OS and AppleScript automation',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Keep all intermediate files
+  python slice_and_fuse_baseplates.py
+  
+  # Delete intermediate files (keep only originals and final outputs)
+  python slice_and_fuse_baseplates.py --delete-intermediate
+
+⚠️  Note: This script is Mac OS only. Windows support not yet implemented.
+        '''
+    )
+    parser.add_argument(
+        '--delete-intermediate',
+        action='store_true',
+        help='Delete intermediate files after processing (keeps only original .3mf and final _with_baseplate.gcode.3mf files)'
+    )
+    
+    args = parser.parse_args()
+    
     print("="*60)
     print("AUTOMATED BASEPLATE PIPELINE")
     print("="*60)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if args.delete_intermediate:
+        print("🗑️  Intermediate file deletion: ENABLED")
+    else:
+        print("📁 Intermediate file deletion: DISABLED (keeping all files)")
+    print("="*60)
     
     # Configuration
     downloads_dir = Path.home() / "Downloads"
     n_layers = 10
     buffer_mm = 4.0
     layers_to_replace = 10
+    delete_intermediate_files = args.delete_intermediate
+    delete_intermediate_files = True  # Set to False to keep all intermediate files
     
     # Initialize automation
     try:
@@ -461,6 +510,30 @@ def main():
             results.append(file_results)
             continue
         file_results['fused'] = fused_file
+        
+        # Cleanup: Delete intermediate files if option is enabled
+        if delete_intermediate_files:
+            print(f"\n[CLEANUP] Deleting intermediate files...")
+            files_to_delete = []
+            if sliced_gcode_3mf.exists():
+                files_to_delete.append(sliced_gcode_3mf)
+            if baseplate_3mf.exists():
+                files_to_delete.append(baseplate_3mf)
+            if baseplate_gcode_3mf.exists():
+                files_to_delete.append(baseplate_gcode_3mf)
+            
+            for file_to_delete in files_to_delete:
+                try:
+                    file_to_delete.unlink()
+                    print(f"  🗑️  Deleted: {file_to_delete.name}")
+                except Exception as e:
+                    print(f"  ⚠️  Could not delete {file_to_delete.name}: {e}")
+        
+        # Close Bambu Studio after processing this file (will restart for next file)
+        if idx < len(recent_files):
+            print(f"\n[CLOSE] Closing Bambu Studio before next file...")
+            automation.quit_bambu_studio()
+            time.sleep(2)  # Brief pause after closing
         
         results.append(file_results)
         

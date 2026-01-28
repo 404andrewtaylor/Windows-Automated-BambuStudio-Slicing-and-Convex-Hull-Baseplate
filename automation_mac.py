@@ -64,6 +64,15 @@ class BambuStudioAutomation:
             print(f"❌ Error starting Bambu Studio: {e}")
             return False
     
+    def quit_bambu_studio(self):
+        """Quit Bambu Studio application."""
+        print("🔒 Closing Bambu Studio...")
+        script = '''
+        tell application "BambuStudio" to quit
+        delay 1
+        '''
+        return self._run_applescript(script)
+    
     def slice_stl(self, stl_path, output_dir=None):
         """
         Slice an STL file using Bambu Studio.
@@ -149,7 +158,7 @@ class BambuStudioAutomation:
         
         return self._run_applescript(script)
     
-    def slice_3mf(self, three_mf_path, output_gcode_3mf=None, slice_delay=15, file_load_delay=8):
+    def slice_3mf(self, three_mf_path, output_gcode_3mf=None, slice_delay=15, file_load_delay=8, quit_after=False):
         """
         Open a 3MF project file, slice it, and export as G-code 3MF.
         
@@ -159,6 +168,7 @@ class BambuStudioAutomation:
                 If None, uses same directory as input with .gcode.3mf extension.
             slice_delay (int): Delay in seconds after starting slice (default: 15)
             file_load_delay (int): Delay in seconds after opening file (default: 8)
+            quit_after (bool): Whether to quit Bambu Studio after slicing (default: False)
         
         Returns:
             bool: True if successful, False otherwise
@@ -175,6 +185,32 @@ class BambuStudioAutomation:
         print(f"🔧 Slicing 3MF file: {three_mf_path}")
         print(f"   Output: {output_gcode_3mf}")
         
+        # Ensure Bambu Studio is running before opening file
+        # Check if it's running, if not start it
+        check_script = '''
+        tell application "System Events"
+            set isRunning to (name of processes) contains "BambuStudio"
+        end tell
+        return isRunning
+        '''
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", check_script],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            is_running = "true" in result.stdout.lower()
+        except:
+            is_running = False
+        
+        if not is_running:
+            print("🚀 Bambu Studio not running, starting it...")
+            if not self.start_bambu_studio():
+                print("❌ Failed to start Bambu Studio")
+                return False
+            time.sleep(2)  # Give it a moment to fully start
+        
         # Open the 3MF file in Bambu Studio via `open -a` (avoids Open dialog)
         try:
             subprocess.run(["open", "-a", "BambuStudio", three_mf_path], check=True)
@@ -185,6 +221,13 @@ class BambuStudioAutomation:
         
         # Escape for AppleScript: backslashes and quotes
         path_out_esc = output_gcode_3mf.replace("\\", "\\\\").replace('"', '\\"')
+        
+        # Build script - conditionally include quit command
+        quit_command = ""
+        if quit_after:
+            quit_command = '''
+                keystroke "q" using command down
+                delay 1'''
         
         script = f'''
         tell application "BambuStudio" to activate
@@ -198,18 +241,21 @@ class BambuStudioAutomation:
                 keystroke "g" using command down
                 delay 4
                 -- Type full path character by character (more reliable)
+                -- Type first character, wait 1 second for dialog to be ready, then type rest
                 set savePath to "{path_out_esc}"
-                repeat with i from 1 to count of characters of savePath
-                    keystroke character i of savePath
-                    delay 0.05
-                end repeat
+                if count of characters of savePath > 0 then
+                    keystroke character 1 of savePath
+                    delay 1
+                    repeat with i from 2 to count of characters of savePath
+                        keystroke character i of savePath
+                        delay 0.05
+                    end repeat
+                end if
                 delay 1
                 keystroke return
                 delay 0.5
                 keystroke return
-                delay 5
-                keystroke "q" using command down
-                delay 1
+                delay 5{quit_command}
             end tell
         end tell
         '''

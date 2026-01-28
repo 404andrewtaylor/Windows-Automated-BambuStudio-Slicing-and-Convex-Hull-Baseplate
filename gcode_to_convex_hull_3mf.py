@@ -3,6 +3,8 @@
 Standalone script to extract bottom layers from .gcode.3mf, create convex hull,
 buffer it, and convert to .3mf file.
 
+✅ OS-AGNOSTIC - This script works on Mac, Windows, and Linux.
+
 This script:
 1. Extracts G-code from a .gcode.3mf file
 2. Parses the bottom 10 layers
@@ -11,6 +13,11 @@ This script:
 5. Clips it to the 180mm build plate boundaries
 6. Converts the hull to STL
 7. Converts the STL to .3mf using the same core logic as paint_stl.py
+
+Requirements:
+- Python 3.6+
+- numpy, trimesh (pip install numpy trimesh)
+- No OS-specific dependencies
 """
 
 import os
