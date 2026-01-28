@@ -66,8 +66,7 @@ def slice_original_stl(input_stl, script_dir):
         elif platform.system() == "Darwin":
             from automation_mac import slice_stl_file
         else:
-            print("[ERROR] Error: Unsupported platform. Only Windows and macOS are supported.")
-            return False
+            from automation_linux import slice_stl_file
         
         return slice_stl_file(input_stl)
     
@@ -165,8 +164,7 @@ def slice_naive_baseplate(hull_stl, output_dir, stl_name, script_dir):
         elif platform.system() == "Darwin":
             from automation_mac import import_move_slice_file
         else:
-            print("[ERROR] Error: Unsupported platform. Only Windows and macOS are supported.")
-            return None
+            from automation_linux import import_move_slice_file
         
         # Slice without movement (x_moves=0, y_moves=0)
         success = import_move_slice_file(hull_stl, 0, 0, naive_gcode_3mf, naive_3mf)
@@ -516,8 +514,7 @@ def import_move_slice_hull(hull_stl, x_moves, y_moves, output_dir, stl_name, scr
         elif platform.system() == "Darwin":
             from automation_mac import import_move_slice_file
         else:
-            print("[ERROR] Error: Unsupported platform. Only Windows and macOS are supported.")
-            return False, None, None
+            from automation_linux import import_move_slice_file
         
         success = import_move_slice_file(hull_stl, x_moves, y_moves, hull_gcode_3mf, hull_3mf)
         
@@ -803,35 +800,35 @@ def main():
         if hull_gcode_3mf is None:
             # Step 3 & 4: Create baseplate (either convex hull or full-size rectangle)
             if USE_CONVEX_HULL:
-            # Original convex hull method
-            print("")
-            print("[HULL] Using convex hull baseplate method...")
-            
-            # Step 3: Extract convex hull and create hull STL
-            hull_stl = create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl)
-            if not hull_stl:
-                print("[ERROR] Error: Failed to create hull STL")
-                sys.exit(1)
-            
-            # Step 4: Calculate offset and move/slice hull
-            print("")
-            print("[PROCESS] Step 4: Calculating offset and moving/slicing hull...")
-            print("   Importing hull STL, moving it, slicing, and exporting...")
-            
-            # Find original 3MF file
-            original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
-            
-            if not os.path.exists(original_3mf):
-                print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
-                sys.exit(1)
-            
-            # Calculate offset using naive baseplate method
-            x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
-            
-            # Import, move, slice, and export hull
-            success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
-                hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
-            )
+                # Original convex hull method
+                print("")
+                print("[HULL] Using convex hull baseplate method...")
+                
+                # Step 3: Extract convex hull and create hull STL
+                hull_stl = create_hull_stl(gcode_3mf, output_dir, stl_name, script_dir, input_stl)
+                if not hull_stl:
+                    print("[ERROR] Error: Failed to create hull STL")
+                    sys.exit(1)
+                
+                # Step 4: Calculate offset and move/slice hull
+                print("")
+                print("[PROCESS] Step 4: Calculating offset and moving/slicing hull...")
+                print("   Importing hull STL, moving it, slicing, and exporting...")
+                
+                # Find original 3MF file
+                original_3mf = os.path.abspath(os.path.join(stl_dir, f"{stl_name}.3mf"))
+                
+                if not os.path.exists(original_3mf):
+                    print(f"[ERROR] Error: Original 3MF file not found: {original_3mf}")
+                    sys.exit(1)
+                
+                # Calculate offset using naive baseplate method
+                x_moves, y_moves = calculate_offset(original_3mf, hull_stl, output_dir, stl_name, script_dir)
+                
+                # Import, move, slice, and export hull
+                success, hull_gcode_3mf, hull_3mf = import_move_slice_hull(
+                    hull_stl, x_moves, y_moves, output_dir, stl_name, script_dir
+                )
             
             # Fallback: If hull gcode not found, create rectangle baseplate
             if not success or not os.path.exists(hull_gcode_3mf):
