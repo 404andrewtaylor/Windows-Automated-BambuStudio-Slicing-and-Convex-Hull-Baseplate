@@ -85,6 +85,11 @@ def slice_3mf_file(automation: BambuStudioAutomation, three_mf_path: Path,
     print(f"SLICING: {three_mf_path.name}")
     print(f"{'=' * 60}")
 
+    # Ensure Bambu Studio is closed before starting
+    print("🔒 Ensuring Bambu Studio is closed before starting...")
+    automation.quit_bambu_studio()
+    time.sleep(2)
+
     file_load_delay = 8
     slice_delay = 15
 
@@ -102,7 +107,7 @@ def slice_3mf_file(automation: BambuStudioAutomation, three_mf_path: Path,
             str(output_gcode_3mf),
             file_load_delay=file_load_delay,
             slice_delay=slice_delay,
-            quit_after=False,
+            quit_after=True,  # Close Bambu Studio completely after slicing
         )
 
         time.sleep(2)
@@ -195,6 +200,11 @@ def slice_baseplate(automation: BambuStudioAutomation, baseplate_3mf_path: Path,
     print(f"SLICING BASEPLATE: {baseplate_3mf_path.name}")
     print(f"{'=' * 60}")
 
+    # Ensure Bambu Studio is closed before starting
+    print("🔒 Ensuring Bambu Studio is closed before starting...")
+    automation.quit_bambu_studio()
+    time.sleep(2)
+
     file_load_delay = 8
     slice_delay = 5
 
@@ -212,7 +222,8 @@ def slice_baseplate(automation: BambuStudioAutomation, baseplate_3mf_path: Path,
             str(output_baseplate_gcode_3mf),
             file_load_delay=file_load_delay,
             slice_delay=slice_delay,
-            quit_after=False,
+            quit_after=True,  # Close Bambu Studio after slicing baseplate
+            new_project=True,  # Create new project before importing baseplate
         )
 
         time.sleep(2)
@@ -455,6 +466,11 @@ def main():
         print("")
         print("Waiting 5 seconds before next file...")
         time.sleep(5)
+
+    # Ensure Bambu Studio is closed at the end
+    print("")
+    print("🔒 Closing Bambu Studio at end of pipeline...")
+    automation.quit_bambu_studio()
 
     # Summary
     print("")

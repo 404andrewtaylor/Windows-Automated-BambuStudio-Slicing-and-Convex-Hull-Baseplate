@@ -127,24 +127,90 @@ class BambuStudioAutomation:
             print(f"[LINUX][ERROR] Unexpected error starting Bambu Studio: {e}")
             return False
 
+    def quit_bambu_studio(self):
+        """Close Bambu Studio safely using Flatpak kill (safer than Alt+F4)."""
+        print("[LINUX] Closing Bambu Studio...")
+        try:
+            # Check if Bambu Studio is actually running first
+            try:
+                result = subprocess.run(
+                    ["flatpak", "ps", "--columns=application"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if "com.bambulab.BambuStudio" not in result.stdout:
+                    print("[LINUX] Bambu Studio is not running, nothing to close")
+                    return True
+            except:
+                # If we can't check, proceed anyway - better safe than sorry
+                pass
+            
+            # Use Flatpak kill - this is safer than Alt+F4 which can trigger logout
+            print("[LINUX] Using Flatpak kill to close Bambu Studio...")
+            try:
+                result = subprocess.run(
+                    ["flatpak", "kill", "com.bambulab.BambuStudio"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                # flatpak kill returns 0 if successful, or non-zero if app wasn't running
+                # Both are fine - we just want to ensure it's closed
+                time.sleep(2)
+                print("[LINUX] Bambu Studio closed")
+                return True
+            except subprocess.TimeoutExpired:
+                print("[LINUX] Flatpak kill timed out, but continuing...")
+                return True
+            except FileNotFoundError:
+                print("[LINUX] Flatpak command not found, trying Ctrl+Q as fallback...")
+                # Fallback to Ctrl+Q if Flatpak isn't available
+                self._click_center()
+                time.sleep(0.5)
+                self._press_key_combination("ctrl", "q")
+                time.sleep(3)
+                return True
+            except Exception as e:
+                print(f"[LINUX] Flatpak kill had issue (may be fine if already closed): {e}")
+                return True
+                
+        except Exception as e:
+            print(f"[LINUX][ERROR] Error closing Bambu Studio: {e}")
+            # Try Flatpak kill as last resort
+            try:
+                subprocess.run(
+                    ["flatpak", "kill", "com.bambulab.BambuStudio"],
+                    capture_output=True,
+                    timeout=5
+                )
+            except:
+                pass
+            return False
+
     # ------------------------------------------------------------------
     # Public high-level operations (mirror other platforms)
     # ------------------------------------------------------------------
 
     def slice_3mf(self, three_mf_path, output_gcode_3mf=None,
-                  slice_delay=15, file_load_delay=8, quit_after=False):
+                  slice_delay=15, file_load_delay=8, quit_after=False, new_project=False):
         """
         Open a 3MF project file, slice it, and export as G-code 3MF on Linux.
 
         Keyboard sequence (as requested):
         1. Start Bambu Studio
-        2. Ctrl+I to open 3MF import dialog
-        3. Ctrl+L to focus path entry
-        4. Type input 3MF path, Enter
-        5. Ctrl+R to slice
-        6. Ctrl+G to save
-        7. Ctrl+A to select path field, type output path, Enter (twice)
-        8. Alt+F4 to close (if quit_after is True)
+        2. Ctrl+N to create new project (if new_project=True)
+        3. Ctrl+I to open 3MF import dialog
+        4. Ctrl+L to focus path entry
+        5. Type input 3MF path, Enter
+        6. Ctrl+R to slice
+        7. Ctrl+G to save
+        8. Ctrl+A to select path field, type output path, Enter (twice)
+        9. Alt+F4 to close (if quit_after is True)
+
+        Args:
+            new_project (bool): If True, create a new project (Ctrl+N) before importing.
+                Useful when Bambu Studio already has a project open.
         """
         three_mf_path = os.path.abspath(three_mf_path)
         if output_gcode_3mf is None:
@@ -172,6 +238,13 @@ class BambuStudioAutomation:
             return False
 
         try:
+            # 0) Create new project if requested (useful when previous project is still open)
+            if new_project:
+                print("[LINUX] Creating new project (Ctrl+N)...")
+                if not self._press_key_combination("ctrl", "n"):
+                    return False
+                time.sleep(4)
+
             # 1) Import 3MF: Ctrl+I, then Ctrl+L to focus path entry
             print("[LINUX] Opening import dialog (Ctrl+I)...")
             if not self._press_key_combination("ctrl", "i"):
@@ -224,9 +297,7 @@ class BambuStudioAutomation:
 
             # 5) Optionally close Bambu Studio
             if quit_after:
-                print("[LINUX] Closing Bambu Studio (Alt+F4)...")
-                self._press_key_combination("alt", "f4")
-                time.sleep(2)
+                self.quit_bambu_studio()
 
             print("[LINUX] 3MF slicing completed successfully")
             return True
